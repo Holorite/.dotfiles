@@ -106,13 +106,13 @@ source $ZSH/oh-my-zsh.sh
 # alias zshconfig="mate ~/.zshrc"
 # alias ohmyzsh="mate ~/.oh-my-zsh"
 
-alias connie="tmux -u a -t connie"
-
+alias startwork="tmux -u"
 alias work="tmux -u a -t work"
 
 alias gotowork="cd ~/dev"
 
-alias vi="nvim"
+alias vi="~/nvim.appimage"
+alias nvim="~/nvim.appimage"
 
 alias dcu="sudo devcontainer up --workspace-folder ."
 function dce() {
