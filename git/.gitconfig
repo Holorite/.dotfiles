@@ -1,0 +1,16 @@
+[alias]
+	st = status -sb
+	br = branch --show-current
+	co = checkout
+[user]
+	email = julian.r8y@gmail.com
+	name = Julian Ray
+[core]
+	editor = nvim
+[init]
+	defaultBranch = main
+[filter "lfs"]
+	clean = git-lfs clean -- %f
+	smudge = git-lfs smudge -- %f
+	process = git-lfs filter-process
+	required = true
