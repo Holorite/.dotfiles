@@ -127,3 +127,5 @@ alias dcct="sudo /usr/bin/time devcontainer exec --workspace-folder . meson comp
 alias dcsh="sudo devcontainer exec --workspace-folder . -- /usr/bin/zsh"
 alias ubtime="/usr/bin/time "
 alias rmbuild="sudo rm -rf build"
+
+if [ -e /home/julian/.nix-profile/etc/profile.d/nix.sh ]; then . /home/julian/.nix-profile/etc/profile.d/nix.sh; fi # added by Nix installer
