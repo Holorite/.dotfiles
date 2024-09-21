@@ -84,6 +84,8 @@ source $ZSH/oh-my-zsh.sh
 
 # export MANPATH="/usr/local/man:$MANPATH"
 
+export PATH="/homes/r/rayjulia/.local/bin:$PATH"
+
 # You may need to manually set your language environment
 # export LANG=en_US.UTF-8
 
@@ -111,8 +113,7 @@ alias work="tmux -u a -t work"
 
 alias gotowork="cd ~/dev"
 
-alias vi="~/nvim.appimage"
-alias nvim="~/nvim.appimage"
+alias vi="nvim"
 
 alias dcu="sudo devcontainer up --workspace-folder ."
 function dce() {
