@@ -11,7 +11,8 @@ return {
         mason.setup()
         mason_lspconfig.setup({
             ensure_installed = {
-                "clangd"
+                "clangd",
+                "pyright"
             },
             automatic_installation = true,
         })

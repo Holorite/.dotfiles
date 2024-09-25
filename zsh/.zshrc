@@ -85,6 +85,9 @@ source $ZSH/oh-my-zsh.sh
 # export MANPATH="/usr/local/man:$MANPATH"
 
 export PATH="/homes/r/rayjulia/.local/bin:$PATH"
+export PATH="$HOME/.cargo/env:$PATH"
+export PATH="/usr/lib/linux-tools-5.15.0-122:$PATH"
+export PATH="$PATH:/opt/nvim/"
 
 # You may need to manually set your language environment
 # export LANG=en_US.UTF-8
