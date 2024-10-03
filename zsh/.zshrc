@@ -70,7 +70,7 @@ ZSH_THEME="robbyrussell"
 # Custom plugins may be added to $ZSH_CUSTOM/plugins/
 # Example format: plugins=(rails git textmate ruby lighthouse)
 # Add wisely, as too many plugins slow down shell startup.
-plugins=(git)
+plugins=(git nvm)
 
 plugins+=(vi-mode)
 
@@ -88,6 +88,7 @@ export PATH="/homes/r/rayjulia/.local/bin:$PATH"
 export PATH="$HOME/.cargo/env:$PATH"
 export PATH="/usr/lib/linux-tools-5.15.0-122:$PATH"
 export PATH="$PATH:/opt/nvim/"
+export PATH="$PATH:/opt/nvim-linux64/bin"
 
 # You may need to manually set your language environment
 # export LANG=en_US.UTF-8
