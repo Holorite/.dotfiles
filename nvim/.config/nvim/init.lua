@@ -35,6 +35,7 @@ vim.opt.scrolloff=8
 
 vim.opt.updatetime=80
 
+vim.opt.signcolumn="yes"
 
 vim.opt.showcmd=true             -- Show (partial) command in status line.
 vim.opt.showmatch=true           -- Show matching brackets.
