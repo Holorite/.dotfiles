@@ -15,5 +15,10 @@ return {
             function() require("gitsigns").blame() end,
             desc = "Open side bar with git blame",
         },
+        {
+            "<leader>gd",
+            function() require("gitsigns").diffthis() end,
+            desc = "Diff current file",
+        }
     },
 }
