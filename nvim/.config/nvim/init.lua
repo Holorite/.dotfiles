@@ -21,7 +21,7 @@ vim.opt.shiftwidth=4
 vim.opt.expandtab=true
 vim.opt.smartindent=true
 
-vim.g.wrap=false
+vim.opt.wrap=false
 
 -- highlight searches
 vim.opt.hlsearch=false
