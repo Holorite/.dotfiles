@@ -15,7 +15,7 @@ vim.opt.errorbells=false
 vim.opt.hidden=true
 
 -- tabs
-vim.opt.tabstop=4 
+vim.opt.tabstop=4
 vim.opt.softtabstop=4
 vim.opt.shiftwidth=4
 vim.opt.expandtab=true
@@ -128,16 +128,26 @@ vim.api.nvim_set_keymap(
   { noremap = true }
 )
 
+vim.diagnostic.config({signs = false})
+
 vim.api.nvim_create_autocmd('LspAttach', {
   callback = function(ev)
-    local bufmap = function(mode, lhs, rhs)
-      local opts = {buffer = true}
+    local bufmap = function(mode, lhs, rhs, description)
+      local opts = {buffer = ev.buffer, desc=description}
       vim.keymap.set(mode, lhs, rhs, opts)
     end
 
     -- Displays hover information about the symbol under the cursor
-    bufmap('n', '<C-j>', '<cmd>lua vim.diagnostic.open_float()<cr>')
-    bufmap('n', '<F2>', '<cmd>lua vim.lsp.buf.rename()<cr>')
+    bufmap("n", "gd", function() vim.lsp.buf.definition() end, 'Go to definition')
+    bufmap("n", "K", function() vim.lsp.buf.hover() end, 'Open hover')
+    bufmap("n", "<leader>vws", function() vim.lsp.buf.workspace_symbol() end, 'Workspace symbol')
+    bufmap("n", "<leader>vca", function() vim.lsp.buf.code_action() end, 'Code actions')
+    bufmap("n", "<leader>vrr", function() vim.lsp.buf.references() end, 'References')
+    bufmap("n", "<leader>vrn", function() vim.lsp.buf.rename() end, 'Rename')
+    bufmap("i", "<C-h>", function() vim.lsp.buf.signature_help() end, 'Signature help')
+    bufmap('n', '<C-j>', function() vim.diagnostic.open_float() end, 'Open float')
+    bufmap("n", "[d", function() vim.diagnostic.goto_next() end, 'Go to next diagnostic')
+    bufmap("n", "]d", function() vim.diagnostic.goto_prev() end, 'Go to prev diagnostic')
   end
 })
 

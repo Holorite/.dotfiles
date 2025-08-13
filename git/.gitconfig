@@ -9,6 +9,7 @@
 	editor = nvim
 [init]
 	defaultBranch = main
+	templateDir = /prj/qct/coredev/hexnn/sitelinks/arch/pkg/githook_templates/x86_64/master/TEMPL
 [filter "lfs"]
 	clean = git-lfs clean -- %f
 	smudge = git-lfs smudge -- %f

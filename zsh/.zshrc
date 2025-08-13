@@ -112,10 +112,11 @@ export PATH="$PATH:/opt/nvim-linux64/bin"
 # alias zshconfig="mate ~/.zshrc"
 # alias ohmyzsh="mate ~/.oh-my-zsh"
 
-alias startwork="tmux -u"
-alias work="tmux -u a -t work"
+alias startwork="tmux"
+alias work="tmux a -t work"
 
 alias gotowork="cd ~/dev"
+alias scratch="cd /prj/qct/mlsys/markham/scratch/juliray"
 
 alias vi="nvim"
 
@@ -134,3 +135,7 @@ alias ubtime="/usr/bin/time "
 alias rmbuild="sudo rm -rf build"
 
 if [ -e /home/julian/.nix-profile/etc/profile.d/nix.sh ]; then . /home/julian/.nix-profile/etc/profile.d/nix.sh; fi # added by Nix installer
+
+export NVM_DIR="$HOME/.nvm"
+[ -s "$NVM_DIR/nvm.sh" ] && \. "$NVM_DIR/nvm.sh"  # This loads nvm
+[ -s "$NVM_DIR/bash_completion" ] && \. "$NVM_DIR/bash_completion"  # This loads nvm bash_completion
