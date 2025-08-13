@@ -46,7 +46,7 @@ vim.opt.showtabline=2
 vim.opt.splitbelow=true
 vim.opt.splitright=true
 
-vim.opt.mouse=nil
+vim.opt.mouse=""
 
 vim.g.matchparen_timeout = 2
 vim.g.matchparen_insert_timeout = 2
