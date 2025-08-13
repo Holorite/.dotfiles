@@ -115,7 +115,7 @@ nmap("<leader>fh", "<cmd>Telescope help_tags<cr>")
 
 vim.api.nvim_set_keymap(
   "n",
-  "<space>fb",
+  "<leader>fb",
   ":Telescope file_browser<CR>",
   { noremap = true }
 )
@@ -123,10 +123,12 @@ vim.api.nvim_set_keymap(
 -- open file_browser with the path of the current buffer
 vim.api.nvim_set_keymap(
   "n",
-  "<space>fc",
+  "<leader>fc",
   ":Telescope file_browser path=%:p:h select_buffer=true<CR>",
   { noremap = true }
 )
+
+vim.api.nvim_set_keymap('x', '<leader>p', "\"_dP", { noremap = true })
 
 vim.api.nvim_create_autocmd('LspAttach', {
   callback = function(ev)
