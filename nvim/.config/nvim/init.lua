@@ -128,8 +128,6 @@ vim.api.nvim_set_keymap(
   { noremap = true }
 )
 
-vim.api.nvim_set_keymap('x', '<leader>p', "\"_dP", { noremap = true })
-
 vim.api.nvim_create_autocmd('LspAttach', {
   callback = function(ev)
     local bufmap = function(mode, lhs, rhs)
