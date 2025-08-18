@@ -19,6 +19,36 @@ return {
             "<leader>gd",
             function() require("gitsigns").diffthis() end,
             desc = "Diff current file",
+        },
+        {
+            "]c",
+            function()
+                if vim.wo.diff then
+                    vim.cmd.normal({']c', bang = true})
+                else
+                    require("gitsigns").nav_hunk('next')
+                end
+            end,
+            desc = "Go to next hunk",
+        },
+        {
+            "[c",
+            function()
+                if vim.wo.diff then
+                    vim.cmd.normal({'[c', bang = true})
+                else
+                    require("gitsigns").nav_hunk('prev')
+                end
+            end,
+            desc = "Go to prev hunk",
+        },
+        {
+            "ih",
+            function()
+                require("gitsigns").select_hunk()
+            end,
+            mode = {'o', 'x'},
+            desc = 'Select Hunk',
         }
     },
 }

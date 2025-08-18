@@ -24,7 +24,6 @@ vim.opt.smartindent=true
 vim.opt.wrap=false
 
 -- highlight searches
-vim.opt.hlsearch=false
 vim.opt.hlsearch=true
 vim.opt.incsearch=true
 vim.opt.ignorecase=true
@@ -137,8 +136,9 @@ vim.api.nvim_create_autocmd('LspAttach', {
       vim.keymap.set(mode, lhs, rhs, opts)
     end
 
-    -- Displays hover information about the symbol under the cursor
     bufmap("n", "gd", function() vim.lsp.buf.definition() end, 'Go to definition')
+    bufmap("n", "gt", "<cmd>tab split | lua vim.lsp.buf.definition()<CR>", "Go to definition in new tab")
+
     bufmap("n", "K", function() vim.lsp.buf.hover() end, 'Open hover')
     bufmap("n", "<leader>vws", function() vim.lsp.buf.workspace_symbol() end, 'Workspace symbol')
     bufmap("n", "<leader>vca", function() vim.lsp.buf.code_action() end, 'Code actions')
@@ -146,8 +146,8 @@ vim.api.nvim_create_autocmd('LspAttach', {
     bufmap("n", "<leader>vrn", function() vim.lsp.buf.rename() end, 'Rename')
     bufmap("i", "<C-h>", function() vim.lsp.buf.signature_help() end, 'Signature help')
     bufmap('n', '<C-j>', function() vim.diagnostic.open_float() end, 'Open float')
-    bufmap("n", "[d", function() vim.diagnostic.goto_next() end, 'Go to next diagnostic')
-    bufmap("n", "]d", function() vim.diagnostic.goto_prev() end, 'Go to prev diagnostic')
+    bufmap("n", "[d", function() vim.diagnostic.goto_prev() end, 'Go to prev diagnostic')
+    bufmap("n", "]d", function() vim.diagnostic.goto_next() end, 'Go to next diagnostic')
   end
 })
 
