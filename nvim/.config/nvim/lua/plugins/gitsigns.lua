@@ -48,7 +48,17 @@ return {
                 require("gitsigns").select_hunk()
             end,
             mode = {'o', 'x'},
-            desc = 'Select Hunk',
+            desc = 'Select hunk',
+        },
+        {
+            "<leader>hs",
+            function() require("gitsigns").stage_hunk() end,
+            desc = 'Stage hunk',
+        },
+        {
+            "<leader>hr",
+            function() require("gitsigns").reset_hunk() end,
+            desc = 'Reset hunk',
         }
     },
 }
