@@ -127,6 +127,11 @@ vim.api.nvim_set_keymap(
   { noremap = true }
 )
 
+nmap('<C-u>', '<C-u>zz')
+nmap('<C-d>', '<C-d>zz')
+nmap('n', 'nzz')
+nmap('N', 'Nzz')
+
 vim.diagnostic.config({signs = false})
 
 vim.api.nvim_create_autocmd('LspAttach', {
