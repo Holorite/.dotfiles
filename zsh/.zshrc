@@ -134,6 +134,17 @@ alias dcsh="sudo devcontainer exec --workspace-folder . -- /usr/bin/zsh"
 alias ubtime="/usr/bin/time "
 alias rmbuild="sudo rm -rf build"
 
+function check_uptime() {
+    for ((i=0; i<=8; i++)); do
+        ssh "argos-$i" -t uptime
+    done
+}
+function check_python() {
+    for ((i=0; i<=8; i++)); do
+        ssh "argos-$i" -t python3 -V
+    done
+}
+
 if [ -e /home/julian/.nix-profile/etc/profile.d/nix.sh ]; then . /home/julian/.nix-profile/etc/profile.d/nix.sh; fi # added by Nix installer
 
 export NVM_DIR="$HOME/.nvm"
