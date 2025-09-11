@@ -92,6 +92,8 @@ function tmap(shortcut, command)
     map('t', shortcut, command)
 end
 
+vmap('<Space>', '<Nop>')
+
 nmap("vs", ":vs<CR>")
 nmap("sp", ":sp<CR>")
 nmap("<C-L>", "<C-W><C-L>")
@@ -107,10 +109,16 @@ nmap("<C-N>", ":Lexplore<CR> :vertical resize 30<CR>")
 nmap("<leader>n", ":noh<CR>")
 tmap("<Esc>", "<C-\\><C-n>")
 
-nmap("<leader>ff", "<cmd>Telescope find_files<cr>")
-nmap("<leader>fg", "<cmd>Telescope live_grep<cr>")
-nmap("<leader>fb", "<cmd>Telescope buffers<cr>")
+local tc = require('telescope.builtin')
+
+nmap("<leader>ff", function() tc.git_files() end, "Telescope find git files")
+nmap("<leader>fa", function() tc.find_files() end, "Telescope find")
+vmap("<leader>fs", function() tc.grep_string() end, "Telescope grep cursor string")
+nmap("<leader>fg", function() tc.live_grep() end, "Telescope live grep")
+nmap("<leader>fz", function() tc.current_buffer_fuzzy_find() end, 'Fuzzy find in current file')
+nmap("<leader>fo", function() tc.live_grep({grep_open_files=true}) end, 'Telescope grep in open files')
 nmap("<leader>fh", "<cmd>Telescope help_tags<cr>")
+nmap("<leader>fB", "<cmd>Telescope buffers<cr>")
 
 vim.api.nvim_set_keymap(
   "n",
@@ -131,6 +139,8 @@ nmap('<C-u>', '<C-u>zz')
 nmap('<C-d>', '<C-d>zz')
 nmap('n', 'nzz')
 nmap('N', 'Nzz')
+nmap('[m', '[mzz')
+nmap(']m', ']mzz')
 
 vim.diagnostic.config({signs = false})
 
@@ -149,7 +159,6 @@ vim.api.nvim_create_autocmd('LspAttach', {
     bufmap("n", "<leader>vca", function() vim.lsp.buf.code_action() end, 'Code actions')
     bufmap("n", "<leader>vrr", function() vim.lsp.buf.references() end, 'References')
     bufmap("n", "<leader>vrn", function() vim.lsp.buf.rename() end, 'Rename')
-    bufmap("i", "<C-h>", function() vim.lsp.buf.signature_help() end, 'Signature help')
     bufmap('n', '<C-j>', function() vim.diagnostic.open_float() end, 'Open float')
     bufmap("n", "[d", function() vim.diagnostic.goto_prev() end, 'Go to prev diagnostic')
     bufmap("n", "]d", function() vim.diagnostic.goto_next() end, 'Go to next diagnostic')
