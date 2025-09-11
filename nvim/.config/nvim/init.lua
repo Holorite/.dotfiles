@@ -1,6 +1,8 @@
 vim.g.mapleader = "<Space>"
+vim.opt.termguicolors=true
 
 require('config.lazy')
+
 
 vim.opt.background = "dark"
 
@@ -12,7 +14,7 @@ vim.opt.nu=true
 vim.opt.errorbells=false
 
 -- keep closed files in buffer (dont need to save to exit and browse)
-vim.opt.hidden=true
+vim.opt.hidden=false
 
 -- tabs
 vim.opt.tabstop=4
@@ -50,46 +52,21 @@ vim.opt.mouse=""
 vim.g.matchparen_timeout = 2
 vim.g.matchparen_insert_timeout = 2
 
--- tabline settings at the top of the screen
-function Tabline()
-    local line = ''
-    local current = vim.fn.tabpagenr()
-
-    for i = 1, vim.fn.tabpagenr('$') do
-        if i == current then
-            line = line .. '%#TabLineSel#'
-        else
-            line = line .. '%#TabLine#'
-        end
-
-        local label = vim.fn.fnamemodify(vim.fn.bufname(vim.fn.tabpagebuflist(i)[vim.fn.tabpagewinnr(i)]), ':t')
-
-        line = line .. '%' .. i .. 'T' -- Starts mouse click target region.
-        line = line .. '  ' .. label .. '  '
-    end
-
-    line = line .. '%#TabLineFill#'
-    line = line .. '%T' -- Ends mouse click target region(s).
-
-    return line
+local function map(mode, shortcut, command, desc)
+    vim.keymap.set(mode, shortcut, command, { noremap = true, silent = false, desc = desc }) -- change silent to true if you want idk
 end
 
-vim.opt.tabline = "%!v:lua.Tabline()"
-
-function map(mode, shortcut, command)
-    vim.api.nvim_set_keymap(mode, shortcut, command, { noremap = true, silent = false }) -- change silent to true if you want idk
+local function nmap(shortcut, command, desc)
+    map('n', shortcut, command, desc)
 end
-
-function nmap(shortcut, command)
-    map('n', shortcut, command)
+local function vmap(shortcut, command, desc)
+    map('n', shortcut, command, desc)
 end
-
-function imap(shortcut, command)
-    map('i', shortcut, command)
+local function imap(shortcut, command, desc)
+    map('i', shortcut, command, desc)
 end
-
-function tmap(shortcut, command)
-    map('t', shortcut, command)
+local function tmap(shortcut, command, desc)
+    map('t', shortcut, command, desc)
 end
 
 vmap('<Space>', '<Nop>')
