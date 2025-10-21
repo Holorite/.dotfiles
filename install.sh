@@ -18,6 +18,14 @@ git clone https://github.com/tmux-plugins/tpm ~/.tmux/plugins/tpm
 curl -LO https://github.com/neovim/neovim/releases/latest/download/nvim-linux64.tar.gz
 sudo rm -rf /opt/nvim
 sudo tar -C /opt -xzf nvim-linux64.tar.gz
+
+# colorscript
+git clone git@github.com:Holorite/shell-color-scripts-local-install.git
+cd shell-color-scripts-local-install
+make install
+cd ..
+rm -r shell-color-scripts-local-install
+
     
 # gh cli
 (type -p wget >/dev/null || (sudo apt update && sudo apt-get install wget -y)) \

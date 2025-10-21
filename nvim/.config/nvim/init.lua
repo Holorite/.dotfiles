@@ -1,8 +1,10 @@
 vim.g.mapleader = "<Space>"
 vim.opt.termguicolors=true
+-- vim.lsp.set_log_level('debug')
 
 require('config.lazy')
 
+-- vim.lsp.config('clangd', { cmd = { 'clangd', '--log=verbose', '-j=1' }, root_markers = { ".clangd", ".clang-tidy", "compile_commands.json", "compile_flags.txt", "configure.ac", ".git" } })
 
 vim.opt.background = "dark"
 
@@ -94,12 +96,12 @@ vmap("<leader>fs", function() tc.grep_string() end, "Telescope grep cursor strin
 nmap("<leader>fg", function() tc.live_grep() end, "Telescope live grep")
 nmap("<leader>fz", function() tc.current_buffer_fuzzy_find() end, 'Fuzzy find in current file')
 nmap("<leader>fo", function() tc.live_grep({grep_open_files=true}) end, 'Telescope grep in open files')
-nmap("<leader>fh", "<cmd>Telescope help_tags<cr>")
-nmap("<leader>fB", "<cmd>Telescope buffers<cr>")
+nmap("<leader>fh", function() tc.help_tags() end, "Telescope help tags")
+nmap("<leader>fb", function() tc.buffers() end, "Telescope buffers")
 
 vim.api.nvim_set_keymap(
   "n",
-  "<leader>fb",
+  "<leader>fB",
   ":Telescope file_browser<CR>",
   { noremap = true }
 )
