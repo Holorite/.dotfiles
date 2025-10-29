@@ -137,6 +137,8 @@ alias dcsh="sudo devcontainer exec --workspace-folder . -- /usr/bin/zsh"
 alias ubtime="/usr/bin/time "
 alias rmbuild="sudo rm -rf build"
 
+alias gsnu="git st --untracked-files=no"
+
 function check_uptime() {
     for ((i=0; i<=8; i++)); do
         ssh "argos-$i" -t uptime

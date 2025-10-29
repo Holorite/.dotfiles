@@ -4,7 +4,8 @@ vim.opt.termguicolors=true
 
 require('config.lazy')
 
--- vim.lsp.config('clangd', { cmd = { 'clangd', '--log=verbose', '-j=1' }, root_markers = { ".clangd", ".clang-tidy", "compile_commands.json", "compile_flags.txt", "configure.ac", ".git" } })
+vim.lsp.config('clangd', { cmd = { 'clangd' }, root_markers = { "compile_commands.json", ".git" } })
+-- vim.lsp.config('clangd', { cmd = { 'clangd', '--log=verbose', '-j=1' }, root_markers = { "compile_commands.json", ".git" } })
 
 vim.opt.background = "dark"
 
