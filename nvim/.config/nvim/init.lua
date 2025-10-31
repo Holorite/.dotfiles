@@ -5,6 +5,8 @@ vim.opt.termguicolors=true
 require('config.lazy')
 
 vim.lsp.config('clangd', { cmd = { 'clangd' }, root_markers = { "compile_commands.json", ".git" } })
+-- vim.lsp.config('clangd', { cmd = { 'clangd', '--query-driver=/usr/bin/clang*' }, root_markers = { "compile_commands.json", ".git" } })
+-- vim.lsp.config('clangd', { cmd = { '/prj/qct/mlsys/markham/scratch/juliray/hexagon-nn-v3/run-in-docker clangd', '--query-driver=/usr/bin/clang' }, root_markers = { "compile_commands.json", ".git" } })
 -- vim.lsp.config('clangd', { cmd = { 'clangd', '--log=verbose', '-j=1' }, root_markers = { "compile_commands.json", ".git" } })
 
 vim.opt.background = "dark"
@@ -17,7 +19,7 @@ vim.opt.nu=true
 vim.opt.errorbells=false
 
 -- keep closed files in buffer (dont need to save to exit and browse)
-vim.opt.hidden=false
+vim.opt.hidden=true
 
 -- tabs
 vim.opt.tabstop=4
