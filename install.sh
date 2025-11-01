@@ -26,6 +26,9 @@ make install
 cd ..
 rm -r shell-color-scripts-local-install
 
+# fzf
+git clone --depth 1 https://github.com/junegunn/fzf.git ~/.fzf
+~/.fzf/install
     
 # gh cli
 (type -p wget >/dev/null || (sudo apt update && sudo apt-get install wget -y)) \
