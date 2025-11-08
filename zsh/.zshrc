@@ -150,6 +150,8 @@ function check_python() {
     done
 }
 
+export MANPAGER="sh -c 'awk '\''{ gsub(/\x1B\[[0-9;]*m/, \"\", \$0); gsub(/.\x08/, \"\", \$0); print }'\'' | bat -p -lman'"
+
 export FZF_DEFAULT_OPTS=""
 export FZF_DEFAULT_OPTS="$FZF_DEFAULT_OPTS \
   --color=bg+:#283457 \

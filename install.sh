@@ -12,6 +12,9 @@ sudo apt-get update && apt-get install -y \
     bat \
     python3.6
 
+# bat symlink on ubuntu
+ln -s /usr/bin/batcat ~/.local/bin/bat
+
 # tmux
 git clone https://github.com/tmux-plugins/tpm ~/.tmux/plugins/tpm
 
