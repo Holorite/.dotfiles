@@ -1,13 +1,9 @@
 vim.g.mapleader = "<Space>"
 vim.opt.termguicolors=true
--- vim.lsp.set_log_level('debug')
 
 require('config.lazy')
 
 vim.lsp.config('clangd', { cmd = { 'clangd' }, root_markers = { "compile_commands.json", ".git" } })
--- vim.lsp.config('clangd', { cmd = { 'clangd', '--query-driver=/usr/bin/clang*' }, root_markers = { "compile_commands.json", ".git" } })
--- vim.lsp.config('clangd', { cmd = { '/prj/qct/mlsys/markham/scratch/juliray/hexagon-nn-v3/run-in-docker clangd', '--query-driver=/usr/bin/clang' }, root_markers = { "compile_commands.json", ".git" } })
--- vim.lsp.config('clangd', { cmd = { 'clangd', '--log=verbose', '-j=1' }, root_markers = { "compile_commands.json", ".git" } })
 
 vim.opt.background = "dark"
 
