@@ -89,9 +89,6 @@ source $ZSH/oh-my-zsh.sh
 
 export PATH="$HOME/.local/bin:$PATH"
 export PATH="$HOME/.cargo/env:$PATH"
-export PATH="/usr/lib/linux-tools-5.15.0-122:$PATH"
-export PATH="$PATH:/opt/nvim/"
-export PATH="$PATH:/opt/nvim-linux64/bin"
 
 # You may need to manually set your language environment
 # export LANG=en_US.UTF-8
