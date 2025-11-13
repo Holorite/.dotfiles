@@ -11,7 +11,7 @@ return {
             desc = "Toggle inline git blame",
         },
         {
-            "<leader>gb",
+            "<leader>gB",
             function() require("gitsigns").blame() end,
             desc = "Open side bar with git blame",
         },

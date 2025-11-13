@@ -70,8 +70,6 @@ local function tmap(shortcut, command, desc)
     map('t', shortcut, command, desc)
 end
 
-vmap('<Space>', '<Nop>')
-
 nmap("vs", ":vs<CR>")
 nmap("sp", ":sp<CR>")
 nmap("<C-L>", "<C-W><C-L>")
@@ -83,36 +81,10 @@ nmap("tk", ":tabnext<CR>")
 nmap("tj", ":tabprev<CR>")
 nmap("to", ":tabo<CR>")
 nmap("<C-S>", ":%s/")
-nmap("<C-N>", ":Lexplore<CR> :vertical resize 30<CR>")
 nmap("<leader>n", ":noh<CR>")
 tmap("<Esc>", "<C-\\><C-n>")
 
-local tc = require('telescope.builtin')
-
-nmap("<leader>ff", function() tc.git_files() end, "Telescope find git files")
-nmap("<leader>fa", function() tc.find_files() end, "Telescope find")
-vmap("<leader>fs", function() tc.grep_string() end, "Telescope grep cursor string")
-nmap("<leader>fg", function() tc.live_grep() end, "Telescope live grep")
-nmap("<leader>fz", function() tc.current_buffer_fuzzy_find() end, 'Fuzzy find in current file')
-nmap("<leader>fo", function() tc.live_grep({grep_open_files=true}) end, 'Telescope grep in open files')
-nmap("<leader>fh", function() tc.help_tags() end, "Telescope help tags")
-nmap("<leader>fb", function() tc.buffers() end, "Telescope buffers")
-
-vim.api.nvim_set_keymap(
-  "n",
-  "<leader>fB",
-  ":Telescope file_browser<CR>",
-  { noremap = true }
-)
-
--- open file_browser with the path of the current buffer
-vim.api.nvim_set_keymap(
-  "n",
-  "<leader>fc",
-  ":Telescope file_browser path=%:p:h select_buffer=true<CR>",
-  { noremap = true }
-)
-
+-- Recenter convenience
 nmap('<C-u>', '<C-u>zz')
 nmap('<C-d>', '<C-d>zz')
 nmap('n', 'nzz')
