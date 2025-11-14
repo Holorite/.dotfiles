@@ -104,7 +104,6 @@ vim.api.nvim_create_autocmd('LspAttach', {
     bufmap("n", "K", function() vim.lsp.buf.hover() end, 'Open hover')
     bufmap("n", "<leader>vca", function() vim.lsp.buf.code_action() end, 'Code actions')
     bufmap("n", "<leader>vrn", function() vim.lsp.buf.rename() end, 'Rename')
-    bufmap('n', '<C-j>', function() vim.diagnostic.open_float() end, 'Open float')
     bufmap("n", "[d", function() vim.diagnostic.goto_prev() end, 'Go to prev diagnostic')
     bufmap("n", "]d", function() vim.diagnostic.goto_next() end, 'Go to next diagnostic')
   end
