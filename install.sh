@@ -24,7 +24,7 @@ bat --list-themes | grep tokyo # should output "tokyonight_night"
 echo '--theme="tokyonight_night"' >> "$(bat --config-dir)/config"
 
 # tmux
-git clone https://github.com/tmux-plugins/tpm ~/.tmux/plugins/tpm
+./install/tmux/install.sh
 
 # neovim
 ./install/neovim/install.sh
