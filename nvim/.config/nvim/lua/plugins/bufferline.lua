@@ -118,6 +118,12 @@ return {
     config = function(_, opts)
         local bufferline = require('bufferline')
         opts.options.style_preset = bufferline.style_preset.no_italic
+
+        local colo = vim.g.colors_name
+        if colo:find("catppuccin") then
+            opts.highlights = require("catppuccin.special.bufferline").get_theme()
+        end
+
         bufferline.setup(opts)
     end,
 }
