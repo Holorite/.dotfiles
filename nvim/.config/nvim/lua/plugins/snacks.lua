@@ -65,7 +65,7 @@ return {
             },
         },
         input = { enabled = true },
-        picker = { 
+        picker = {
             enabled = true,
             matcher = {
                 frecency = true,
