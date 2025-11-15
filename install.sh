@@ -1,59 +1,49 @@
-sudo apt-get update && apt-get install -y \
-    cmake \
-    clang \
-    zsh \
-    tmux \
-    git \
-    git-lfs \
-    ripgrep \
-    stow \
-    zip \
-    unzip \
-    bat \
-    python3.6
+if [ ! -d ~/.local/bin ]; then
+	mkdir -p ~/.local/bin
+fi
 
-# bat symlink on ubuntu
-ln -s /usr/bin/batcat ~/.local/bin/bat
-# add tokyonight bat theme
-mkdir -p "$(bat --config-dir)/themes"
-cd "$(bat --config-dir)/themes"
-# Replace _night in the lines below with _day, _moon, or _storm if needed.
-curl -O https://raw.githubusercontent.com/folke/tokyonight.nvim/main/extras/sublime/tokyonight_night.tmTheme
-bat cache --build
-bat --list-themes | grep tokyo # should output "tokyonight_night"
-echo '--theme="tokyonight_night"' >> "$(bat --config-dir)/config"
+# sudo apt-get update && apt-get install -y \
+#     cmake \
+#     clang \
+#     zsh \
+#     tmux \
+#     git \
+#     git-lfs \
+#     ripgrep \
+#     stow \
+#     zip \
+#     unzip \
+#     python3.6
+
+# bat
+# ./install/bat/install.sh
 
 # tmux
-./install/tmux/install.sh
+# ./install/tmux/install.sh
 
 # neovim
-./install/neovim/install.sh
+# ./install/neovim/install.sh
 
 # Lazygit
-./install/lazygit/install.sh
+# ./install/lazygit/install.sh
 
 # colorscript
-git clone git@github.com:Holorite/shell-color-scripts-local-install.git
-cd shell-color-scripts-local-install
-make install
-cd ..
-rm -r shell-color-scripts-local-install
+# ./install/colorscript/install.sh
 
 # fzf
-git clone --depth 1 https://github.com/junegunn/fzf.git ~/.fzf
-~/.fzf/install
+# ./install/fzf/install.sh
     
 # gh cli
-(type -p wget >/dev/null || (sudo apt update && sudo apt-get install wget -y)) \
-	&& sudo mkdir -p -m 755 /etc/apt/keyrings \
-	&& wget -qO- https://cli.github.com/packages/githubcli-archive-keyring.gpg | sudo tee /etc/apt/keyrings/githubcli-archive-keyring.gpg > /dev/null \
-	&& sudo chmod go+r /etc/apt/keyrings/githubcli-archive-keyring.gpg \
-	&& echo "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/githubcli-archive-keyring.gpg] https://cli.github.com/packages stable main" | sudo tee /etc/apt/sources.list.d/github-cli.list > /dev/null \
-	&& sudo apt update \
-	&& sudo apt install gh -y
+# (type -p wget >/dev/null || (sudo apt update && sudo apt-get install wget -y)) \
+# 	&& sudo mkdir -p -m 755 /etc/apt/keyrings \
+# 	&& wget -qO- https://cli.github.com/packages/githubcli-archive-keyring.gpg | sudo tee /etc/apt/keyrings/githubcli-archive-keyring.gpg > /dev/null \
+# 	&& sudo chmod go+r /etc/apt/keyrings/githubcli-archive-keyring.gpg \
+# 	&& echo "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/githubcli-archive-keyring.gpg] https://cli.github.com/packages stable main" | sudo tee /etc/apt/sources.list.d/github-cli.list > /dev/null \
+# 	&& sudo apt update \
+# 	&& sudo apt install gh -y
 
 # oh my zsh
-sh -c "$(curl -fsSL https://raw.githubusercontent.com/ohmyzsh/ohmyzsh/master/tools/install.sh)"
+# sh -c "$(curl -fsSL https://raw.githubusercontent.com/ohmyzsh/ohmyzsh/master/tools/install.sh)"
 
 # zsh autocomplete, syntax highlighting, and  
 # git clone https://github.com/zsh-users/zsh-autosuggestions ${ZSH_CUSTOM:-~/.oh-my-zsh/custom}/plugins/zsh-autosuggestions

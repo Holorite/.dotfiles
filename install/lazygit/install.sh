@@ -4,3 +4,6 @@ curl -sL --output lazygit.tar.gz $link
 tar -xzf lazygit.tar.gz
 mv lazygit $HOME/.local/bin/lazygit
 rm lazygit.tar.gz
+
+rm README.md
+rm LICENSE
