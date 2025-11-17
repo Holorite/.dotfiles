@@ -42,7 +42,7 @@ vim.opt.showcmd=true             -- Show (partial) command in status line.
 vim.opt.showmatch=true           -- Show matching brackets.
 vim.opt.autowrite=true           -- Automatically save before commands like :next and :make
 
-vim.opt.showtabline=2
+vim.opt.showtabline=0
 
 vim.opt.splitbelow=true
 vim.opt.splitright=true
