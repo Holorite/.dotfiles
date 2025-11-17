@@ -19,7 +19,7 @@ return {
             desc = "Open side bar with git blame",
         },
         {
-            "<leader>gd",
+            "<leader>gD",
             function() require("gitsigns").diffthis() end,
             desc = "Diff current file",
         },
