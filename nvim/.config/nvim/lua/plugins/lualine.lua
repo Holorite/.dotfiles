@@ -9,12 +9,18 @@ return {
                     component_separators = "",
                     section_separators = { left = "", right = "" },
                 },
+                winbar = {
+                    lualine_c = { 'navic' }
+                },
                 sections = {
                     lualine_a = { { "mode", separator = { left = "" }, right_padding = 2 } },
                     lualine_b = { 'branch', 'diagnostics' },
                     lualine_c = { 'filename' },
                     lualine_x = { 'diff' },
-                    lualine_y = { 'filetype' },
+                    lualine_y = {
+                        'lsp_status',
+                        'filetype',
+                    },
                     lualine_z = {
                         { "progress", separator = " ", padding = { left = 1, right = 0 } },
                         { "location", padding = { left = 0, right = 0 }, separator = { right = "" } },
