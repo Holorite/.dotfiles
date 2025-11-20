@@ -10,12 +10,13 @@ return {
                     section_separators = { left = "", right = "" },
                 },
                 winbar = {
-                    lualine_c = { 'navic' }
+                    -- first component here is just so that the newline is always there
+                    lualine_c = { { function() return ' ' end, padding = { left = 0, right = 0 }, color = { bg = "NONE" } }, 'navic' },
                 },
                 sections = {
                     lualine_a = { { "mode", separator = { left = "" }, right_padding = 2 } },
                     lualine_b = { 'branch', 'diagnostics' },
-                    lualine_c = { 'filename' },
+                    lualine_c = { { 'filename', path = 1 } },
                     lualine_x = { 'diff' },
                     lualine_y = {
                         'lsp_status',
@@ -30,6 +31,9 @@ return {
         end
 
         return {
+            winbar = {
+                lualine_c = { { function() return ' ' end, padding = { left = 0, right = 0 }, color = { bg = "NONE" } }, 'navic' },
+            },
             sections = {
                 lualine_b = { 'branch', 'diagnostics' },
             },

@@ -10,7 +10,7 @@ return {
             require("nvim-navic").attach(client, buffer)
         end)
         return {
-            separator = " 󰜴 ",
+            separator = " 󱦰 ",
             highlight = true,
             -- depth_limit = 5,
             lazy_update_context = false,
