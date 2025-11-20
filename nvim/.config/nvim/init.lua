@@ -69,8 +69,6 @@ local function tmap(shortcut, command, desc)
     map('t', shortcut, command, desc)
 end
 
-nmap("vs", ":vs<CR>")
-nmap("sp", ":sp<CR>")
 nmap("<C-L>", "<C-W><C-L>")
 nmap("<C-H>", "<C-W><C-H>")
 nmap("<C-K>", "<C-W><C-K>")
