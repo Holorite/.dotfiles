@@ -32,6 +32,9 @@ fi
 
 # fzf
 # ./install/fzf/install.sh
+
+# nvm
+# ./install/nvm/install.sh
     
 # gh cli
 # (type -p wget >/dev/null || (sudo apt update && sudo apt-get install wget -y)) \
@@ -54,8 +57,3 @@ stow nvim
 stow zsh
 stow git
 stow tmux
-
-# nvm, node, and npm
-# PROFILE=/dev/null bash -c 'curl -o- https://raw.githubusercontent.com/nvm-sh/nvm/v0.40.1/install.sh | bash'
-# zsh
-# nvm install node

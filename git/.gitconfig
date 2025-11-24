@@ -17,3 +17,5 @@
 	required = true
 [push]
 	autoSetupRemote = true
+[status]
+	showUntrackedFiles = no
