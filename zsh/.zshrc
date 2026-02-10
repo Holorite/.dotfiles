@@ -147,6 +147,11 @@ function check_python() {
     done
 }
 
+function tablegrep() {
+    local script_dir="$(dirname "$(readlink -f "${HOME}/.zshrc")")"
+    grep "$@" | awk -f "${script_dir}/format_grep.awk" | column -t -s $'\t'
+}
+
 export MANPAGER="sh -c 'awk '\''{ gsub(/\x1B\[[0-9;]*m/, \"\", \$0); gsub(/.\x08/, \"\", \$0); print }'\'' | bat -p -lman'"
 
 export FZF_DEFAULT_OPTS=""
