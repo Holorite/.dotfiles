@@ -1,10 +1,19 @@
-return {
+ return {
     'nvim-lualine/lualine.nvim',
     dependencies = { 'nvim-tree/nvim-web-devicons' },
     opts = function()
+        local common_opts = {
+            options = {
+                disabled_filetypes = {
+                    statusline = {'Avante', 'AvanteInput', 'AvanteSelectedFiles', },
+                    winbar = {'Avante', 'AvanteInput', 'AvanteSelectedFiles', },
+                }
+            },
+        }
+
         local colo = vim.g.colors_name
         if colo:find("catppuccin") then
-            return {
+            return vim.tbl_deep_extend("force", common_opts, {
                 options = {
                     component_separators = "",
                     section_separators = { left = "", right = "" },
@@ -27,16 +36,16 @@ return {
                         { "location", padding = { left = 0, right = 0 }, separator = { right = "" } },
                     },
                 },
-            }
+            })
         end
 
-        return {
+        return vim.tbl_deep_extend("force", common_opts, {
             winbar = {
                 lualine_c = { { function() return ' ' end, padding = { left = 0, right = 0 }, color = { bg = "NONE" } }, 'navic' },
             },
             sections = {
                 lualine_b = { 'branch', 'diagnostics' },
             },
-        }
+        })
     end,
 }

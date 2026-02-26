@@ -4,6 +4,8 @@ return {
     opts = {
         preview = {
             icon_provider = "devicons", -- "internal", "mini" or "devicons"
+            filetypes = { "markdown", "quarto", "rmd", "typst", "Avante", },
+            ignore_buftypes = {},
         }
     },
     config = function(_, opts)
