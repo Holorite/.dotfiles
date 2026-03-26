@@ -75,7 +75,7 @@ ZSH_THEME="robbyrussell"
 # Add wisely, as too many plugins slow down shell startup.
 plugins=(git nvm)
 
-plugins+=(vi-mode)
+plugins+=(zsh-vi-mode)
 
 plugins+=(zsh-autosuggestions zsh-syntax-highlighting you-should-use)
 
@@ -87,8 +87,13 @@ source $ZSH/oh-my-zsh.sh
 
 # export MANPATH="/usr/local/man:$MANPATH"
 
+export RUSTUP_HOME=/prj/qct/mlsys/markham/scratch/juliray/.rustup
+export CARGO_HOME=/prj/qct/mlsys/markham/scratch/juliray/.cargo
 export PATH="$HOME/.local/bin:$PATH"
-export PATH="$HOME/.cargo/env:$PATH"
+. "$CARGO_HOME/env"
+
+script_dir="$(dirname "$(readlink -f "${HOME}/.zshrc")")"
+source $script_dir/.zsh_secrets
 
 # You may need to manually set your language environment
 # export LANG=en_US.UTF-8
@@ -112,8 +117,16 @@ export PATH="$HOME/.cargo/env:$PATH"
 # alias zshconfig="mate ~/.zshrc"
 # alias ohmyzsh="mate ~/.oh-my-zsh"
 
+hash -d preptools=/prj/qct/mlsys/markham/scratch/juliray/prepare_time_tools
+hash -d symwork=/prj/qct/mlsys/markham/scratch/juliray/work
+hash -d lwork=/local/mnt/workspace/juliray
+
+function create_work_sym() {
+    ln -s /prj/qct/mlsys/markham/scratch/juliray/work ./symwork
+}
+
 alias startwork="tmux"
-alias work="tmux a -t work"
+alias work="tmux a"
 
 alias gotowork="cd ~/dev"
 alias scratch="cd /prj/qct/mlsys/markham/scratch/juliray"
@@ -135,6 +148,11 @@ alias ubtime="/usr/bin/time "
 alias rmbuild="sudo rm -rf build"
 
 alias gsnu="git st --untracked-files=no"
+
+if [[ ! -d ~/.local/share/nvim/avante/rag_service ]]; then
+    mkdir -p /tmp/avante-rag-service && chmod 777 /tmp/avante-rag-service
+    ln -s /tmp/avante-rag-service ~/.local/share/nvim/avante/rag_service
+fi
 
 function check_uptime() {
     for ((i=0; i<=8; i++)); do
