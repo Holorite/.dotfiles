@@ -4,6 +4,7 @@
     opts = function()
         local common_opts = {
             options = {
+                always_show_tabline = true,
                 disabled_filetypes = {
                     statusline = {'Avante', 'AvanteInput', 'AvanteSelectedFiles', },
                     winbar = {'Avante', 'AvanteInput', 'AvanteSelectedFiles', },
@@ -20,7 +21,11 @@
                 },
                 winbar = {
                     -- first component here is just so that the newline is always there
+                    lualine_b = { 'filename' },
                     lualine_c = { { function() return ' ' end, padding = { left = 0, right = 0 }, color = { bg = "NONE" } }, 'navic' },
+                },
+                inactive_winbar = {
+                    lualine_c = { 'filename' },
                 },
                 sections = {
                     lualine_a = { { "mode", separator = { left = "" }, right_padding = 2 } },
