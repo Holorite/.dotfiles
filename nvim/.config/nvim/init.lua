@@ -60,7 +60,7 @@ local function nmap(shortcut, command, desc)
     map('n', shortcut, command, desc)
 end
 local function vmap(shortcut, command, desc)
-    map('n', shortcut, command, desc)
+    map('v', shortcut, command, desc)
 end
 local function imap(shortcut, command, desc)
     map('i', shortcut, command, desc)
@@ -80,6 +80,10 @@ nmap("to", ":tabo<CR>")
 nmap("<C-S>", ":%s/")
 nmap("<leader>n", ":noh<CR>")
 tmap("<Esc>", "<C-\\><C-n>")
+
+-- Yank to clipboard
+vmap("Y", '"+y', 'Yank to clipboard')
+nmap("yY", '"+y', 'Yank to clipboard')
 
 -- Recenter convenience
 nmap('<C-u>', '<C-u>zz')
