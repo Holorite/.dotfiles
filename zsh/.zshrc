@@ -83,14 +83,18 @@ VI_MODE_SET_CURSOR=true
 
 source $ZSH/oh-my-zsh.sh
 
+# Environment detection
+if [[ -f "$HOME/.dotfiles_env" ]]; then
+    export DOTFILES_ENV=$(< "$HOME/.dotfiles_env")
+else
+    export DOTFILES_ENV="default"
+fi
+
 # User configuration
 
 # export MANPATH="/usr/local/man:$MANPATH"
 
-export RUSTUP_HOME=/prj/qct/mlsys/markham/scratch/juliray/.rustup
-export CARGO_HOME=/prj/qct/mlsys/markham/scratch/juliray/.cargo
 export PATH="$HOME/.local/bin:$PATH"
-. "$CARGO_HOME/env"
 
 script_dir="$(dirname "$(readlink -f "${HOME}/.zshrc")")"
 source $script_dir/.zsh_secrets
@@ -117,53 +121,9 @@ source $script_dir/.zsh_secrets
 # alias zshconfig="mate ~/.zshrc"
 # alias ohmyzsh="mate ~/.oh-my-zsh"
 
-hash -d preptools=/prj/qct/mlsys/markham/scratch/juliray/prepare_time_tools
-hash -d symwork=/prj/qct/mlsys/markham/scratch/juliray/work
-hash -d lwork=/local/mnt/workspace/juliray
-
-function create_work_sym() {
-    ln -s /prj/qct/mlsys/markham/scratch/juliray/work ./symwork
-}
-
-alias startwork="tmux"
-alias work="tmux a"
-
-alias gotowork="cd ~/dev"
-alias scratch="cd /prj/qct/mlsys/markham/scratch/juliray"
-
 alias vi="nvim"
 
-alias dcu="sudo devcontainer up --workspace-folder ."
-function dce() {
-    sudo devcontainer exec --workspace-folder . "$@" ;
-}
-function dcb() {
-    sudo rm -rf build; sudo devcontainer exec --workspace-folder . meson setup "$@" build ;
-}
-alias dcbuild="sudo devcontainer build --workspace-folder ."
-alias dcc="sudo devcontainer exec --workspace-folder . meson compile -C build"
-alias dcct="sudo /usr/bin/time devcontainer exec --workspace-folder . meson compile -C build"
-alias dcsh="sudo devcontainer exec --workspace-folder . -- /usr/bin/zsh"
-alias ubtime="/usr/bin/time "
-alias rmbuild="sudo rm -rf build"
-
-alias gsnu="git st --untracked-files=no"
-
-if [[ ! -d ~/.local/share/nvim/avante/rag_service ]]; then
-    mkdir -p /tmp/avante-rag-service && chmod 777 /tmp/avante-rag-service
-    ln -s /tmp/avante-rag-service ~/.local/share/nvim/avante/rag_service
-fi
-
-function check_uptime() {
-    for ((i=0; i<=8; i++)); do
-        ssh "argos-$i" -t uptime
-    done
-}
-function check_python() {
-    for ((i=0; i<=8; i++)); do
-        ssh "argos-$i" -t python3 -V
-    done
-}
+alias work="tmux a"
 
 function tablegrep() {
     local script_dir="$(dirname "$(readlink -f "${HOME}/.zshrc")")"
@@ -207,3 +167,7 @@ export NVM_DIR="$HOME/.nvm"
 
 zvm_after_init_commands+=('[ -f ~/.fzf.zsh ] && source ~/.fzf.zsh')
 zvm_after_init_commands+=('source <(fzf --zsh)')
+
+# Source environment-specific config
+local _env_file="${script_dir}/env/${DOTFILES_ENV}.zsh"
+[[ -f "$_env_file" ]] && source "$_env_file"

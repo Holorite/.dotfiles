@@ -1,0 +1,4 @@
+[init]
+	templateDir = /prj/qct/coredev/hexnn/sitelinks/arch/pkg/githook_templates/x86_64/master/TEMPL
+[user]
+	email = juliray@qti.qualcomm.com

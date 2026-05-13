@@ -3,6 +3,15 @@ vim.opt.termguicolors=true
 
 require('config.lazy')
 
+if vim.env.DOTFILES_ENV == "work-argos" or vim.env.DOTFILES_ENV == "work-devcompute" then
+    vim.lsp.config('clangd', { cmd = { './run-in-docker', vim.fn.expand("~/.local/share/nvim/mason/bin/clangd"), '--background-index' }, root_markers = { "compile_commands.json", ".git" } })
+elseif vim.env.DOTFILES_ENV == "home" then
+    vim.lsp.config('clangd', { cmd = { 'clangd' }, root_markers = { "compile_commands.json", ".git" } })
+else
+    vim.lsp.config('clangd', { cmd = { 'clangd' }, root_markers = { "compile_commands.json", ".git" } })
+end
+
+
 vim.lsp.config('clangd', { cmd = { 'clangd' }, root_markers = { "compile_commands.json", ".git" } })
 
 vim.opt.background = "dark"

@@ -2,6 +2,23 @@ if [ ! -d ~/.local/bin ]; then
 	mkdir -p ~/.local/bin
 fi
 
+# Set up environment
+if [ ! -f ~/.dotfiles_env ]; then
+	echo "Select DOTFILES_ENV:"
+	echo "  1) work-argos"
+	echo "  2) work-devcompute"
+	echo "  3) home"
+	printf "Choice [1-3]: "
+	read env_choice
+	case "$env_choice" in
+		1) echo "work-argos" > ~/.dotfiles_env ;;
+		2) echo "work-devcompute" > ~/.dotfiles_env ;;
+		3) echo "home" > ~/.dotfiles_env ;;
+		*) echo "Invalid choice"; exit 1 ;;
+	esac
+	echo "DOTFILES_ENV set to: $(cat ~/.dotfiles_env)"
+fi
+
 # sudo apt-get update && apt-get install -y \
 #     cmake \
 #     clang \
@@ -57,3 +74,13 @@ stow nvim
 stow zsh
 stow git
 stow tmux
+
+# Symlink env-specific gitconfig
+DOTFILES_ENV=$(cat ~/.dotfiles_env)
+SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+if [ -f "$SCRIPT_DIR/git/.gitconfig.$DOTFILES_ENV" ]; then
+    ln -sf "$SCRIPT_DIR/git/.gitconfig.$DOTFILES_ENV" ~/.gitconfig.local
+fi
+
+# Use personal email for the dotfiles repo itself
+git -C "$SCRIPT_DIR" config user.email julian.r8y@gmail.com
