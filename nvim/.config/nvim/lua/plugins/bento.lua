@@ -2,14 +2,14 @@ return {
     'serhez/bento.nvim',
     lazy = true,
     init = function()
-        vim.api.nvim_create_autocmd("BufAdd", {
-            callback = function()
-                if #vim.fn.getbufinfo({ buflisted = 1 }) > 1 then
-                    require("bento")
-                    return true
-                end
-            end,
-        })
+        local function try_load_bento()
+            if #vim.fn.getbufinfo({ buflisted = 1 }) > 1 then
+                require("bento")
+                return true
+            end
+        end
+        vim.api.nvim_create_autocmd("BufAdd", { callback = try_load_bento })
+        vim.api.nvim_create_autocmd("VimEnter", { callback = try_load_bento })
     end,
     opts = {
         max_open_buffers = 6,
