@@ -11,9 +11,6 @@ else
     vim.lsp.config('clangd', { cmd = { 'clangd' }, root_markers = { "compile_commands.json", ".git" } })
 end
 
-
-vim.lsp.config('clangd', { cmd = { 'clangd' }, root_markers = { "compile_commands.json", ".git" } })
-
 vim.opt.background = "dark"
 
 -- num settings
