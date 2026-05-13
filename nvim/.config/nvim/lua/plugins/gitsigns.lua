@@ -24,7 +24,7 @@ return {
             desc = "Diff current file",
         },
         {
-            "]c",
+            "]h",
             function()
                 if vim.wo.diff then
                     vim.cmd.normal({']c', bang = true})
@@ -35,7 +35,7 @@ return {
             desc = "Go to next hunk",
         },
         {
-            "[c",
+            "[h",
             function()
                 if vim.wo.diff then
                     vim.cmd.normal({'[c', bang = true})
