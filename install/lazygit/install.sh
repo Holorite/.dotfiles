@@ -1,9 +1,10 @@
-link=$(curl -s https://api.github.com/repos/jesseduffield/lazygit/releases/latest | jq -r '.assets[] | select(.name? | match("tar.gz$")) | .browser_download_url' | grep linux_$(uname -m))
+#!/usr/bin/env bash
+set -euo pipefail
+source "$(dirname "$0")/../lib.sh"
 
-curl -sL --output lazygit.tar.gz $link
-tar -xzf lazygit.tar.gz
-mv lazygit $HOME/.local/bin/lazygit
-rm lazygit.tar.gz
-
-rm README.md
-rm LICENSE
+if should_install lazygit lazygit --version; then
+    info "Installing lazygit..."
+    ensure_eget
+    "$EGET" jesseduffield/lazygit --to "$BIN_DIR" --file lazygit
+    info "lazygit installed"
+fi

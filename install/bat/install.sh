@@ -3,22 +3,29 @@ set -euo pipefail
 source "$(dirname "$0")/../lib.sh"
 
 # ── bat ────────────────────────────────────────────────────────────────────────
-if command -v bat &>/dev/null; then
-    info "bat already installed ($(bat --version))"
-else
+if should_install bat bat --version; then
     info "Installing bat..."
-    link=$(curl -s https://api.github.com/repos/sharkdp/bat/releases/latest | jq -r '.assets[] | select(.name? | match("tar.gz$")) | .browser_download_url' | grep "$(uname -m).*gnu")
-    [[ -z "$link" ]] && error "Failed to fetch bat release URL"
-
-    curl -sL $link | tar -xz -C $BIN_DIR --strip-components=1 --no-same-owner --wildcards '*/bat'
+    ensure_eget
+    "$EGET" sharkdp/bat --to "$BIN_DIR" --file bat
     info "bat installed"
 fi
 
 # ── Tokyo Night theme ──────────────────────────────────────────────────────────
-info "Setting up Tokyo Night theme..."
-mkdir -p "$("$BIN_DIR/bat" --config-dir)/themes"
-curl -sL -o "$("$BIN_DIR/bat" --config-dir)/themes/tokyonight_night.tmTheme" \
-    https://raw.githubusercontent.com/folke/tokyonight.nvim/main/extras/sublime/tokyonight_night.tmTheme
-"$BIN_DIR/bat" cache --build
-echo '--theme="tokyonight_night"' >> "$("$BIN_DIR/bat" --config-dir)/config"
-info "Tokyo Night theme installed"
+config_dir="$("$BIN_DIR/bat" --config-dir)"
+theme_path="$config_dir/themes/tokyonight_night.tmTheme"
+config_file="$config_dir/config"
+
+if should_install_path "Tokyo Night theme" "$theme_path"; then
+    info "Setting up Tokyo Night theme..."
+    mkdir -p "$config_dir/themes"
+    curl -sL -o "$theme_path" \
+        https://raw.githubusercontent.com/folke/tokyonight.nvim/main/extras/sublime/tokyonight_night.tmTheme \
+        || error "Failed to download Tokyo Night theme"
+    "$BIN_DIR/bat" cache --build
+    info "Tokyo Night theme installed"
+fi
+
+if ! grep -q 'tokyonight_night' "$config_file" 2>/dev/null; then
+    echo '--theme="tokyonight_night"' >> "$config_file"
+    info "Tokyo Night theme set as default"
+fi

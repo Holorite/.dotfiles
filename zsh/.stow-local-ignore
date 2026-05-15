@@ -1,3 +1,4 @@
 env
+conf.d
 .zsh_secrets
 format_grep.awk

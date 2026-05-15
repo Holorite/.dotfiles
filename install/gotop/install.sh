@@ -1,6 +1,10 @@
-link=$(curl -s https://api.github.com/repos/xxxserxxx/gotop/releases/latest | jq -r '.assets[] | select(.name? | match("tgz$")) | .browser_download_url' | grep "linux_amd64")
+#!/usr/bin/env bash
+set -euo pipefail
+source "$(dirname "$0")/../lib.sh"
 
-curl -sL --output gotop.tgz "$link"
-tar -xzf gotop.tgz
-mv gotop $HOME/.local/bin/gotop
-rm gotop.tgz
+if should_install gotop gotop -V; then
+    info "Installing gotop..."
+    ensure_eget
+    "$EGET" xxxserxxx/gotop --to "$BIN_DIR" --file gotop
+    info "gotop installed"
+fi

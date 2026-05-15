@@ -1,6 +1,10 @@
-link=$(curl -s https://api.github.com/repos/cli/cli/releases/latest | jq -r '.assets[] | select(.name? | match("linux_amd64.tar.gz$")) | .browser_download_url')
+#!/usr/bin/env bash
+set -euo pipefail
+source "$(dirname "$0")/../lib.sh"
 
-curl -sL --output gh.tar.gz $link
-tar -xzf gh.tar.gz
-mv gh*/bin/gh $HOME/.local/bin/gh
-rm -r gh*
+if should_install gh gh --version; then
+    info "Installing gh..."
+    ensure_eget
+    "$EGET" cli/cli --to "$BIN_DIR" --file gh
+    info "gh installed"
+fi
