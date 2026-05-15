@@ -10,7 +10,7 @@ else
     link=$(curl -s https://api.github.com/repos/sharkdp/bat/releases/latest | jq -r '.assets[] | select(.name? | match("tar.gz$")) | .browser_download_url' | grep "$(uname -m).*gnu")
     [[ -z "$link" ]] && error "Failed to fetch bat release URL"
 
-    curl -sL --output bat.tar.gz $link | tar -xz -C $HOME/.local/bin
+    curl -sL $link | tar -xz -C $HOME/.local/bin
     info "bat installed"
 fi
 
