@@ -37,10 +37,12 @@ eget_install() {
 }
 
 # ── brew (Linuxbrew, home env only) ────────────────────────────────────────────
+source "$(dirname "${BASH_SOURCE[0]}")/../.utils.sh"
+
 export BREW="${BREW:-}"
 
 ensure_brew() {
-    [[ "${DOTFILES_ENV:-}" == "home" ]] || return 1
+    use_brew || return 1
     if [[ -n "$BREW" && -x "$BREW" ]]; then
         return 0
     fi

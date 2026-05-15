@@ -23,7 +23,8 @@ The stow step always runs at the end and links `nvim zsh git tmux` into `$HOME`.
 
 First run prompts for an environment and writes the choice to `~/.dotfiles_env`. Valid values: `work-argos`, `work-devcompute`, `home`. The variable is exported before installers run, sourced by `.zshrc`, and read by `nvim/.config/nvim/init.lua`. Behavior gated on it:
 
-- `install/lib.sh:ensure_brew` — Linuxbrew is bootstrapped/used **only** on `home`. `try_brew` returns 1 elsewhere so installers fall back to `eget`.
+- `install/lib.sh:ensure_brew` — Linuxbrew is bootstrapped/used only when `use_brew` returns true (currently `home`). `try_brew` returns 1 elsewhere so installers fall back to `eget`.
+- `.utils.sh` (repo root, non-stowed) defines `use_brew()` — the canonical brew-vs-fallback gate. Sourced by both `install/lib.sh` and `zsh/.zshrc` so installers and the live shell agree. Use it instead of inlining the env check.
 - `zsh/env/<env>.zsh` is sourced after `conf.d/*.zsh` for env-specific paths/aliases.
 - `git/.gitconfig.<env>` is symlinked to `~/.gitconfig.local` (included by `git/.gitconfig`).
 - `init.lua` configures `clangd` to run via `./run-in-docker` on the work envs, plain `clangd` on home.

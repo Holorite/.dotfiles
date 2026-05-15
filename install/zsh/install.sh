@@ -15,9 +15,11 @@ fi
 # ── Antidote ───────────────────────────────────────────────────────────────────
 if should_install_path Antidote ~/.antidote; then
     info "Installing Antidote..."
-    rm -rf ~/.antidote
-    git clone --depth=1 https://github.com/mattmc3/antidote ~/.antidote \
-        || error "Failed to install Antidote"
+    if ! try_brew antidote; then
+        rm -rf ~/.antidote
+        git clone --depth=1 https://github.com/mattmc3/antidote ~/.antidote \
+            || error "Failed to install Antidote"
+    fi
     info "Antidote installed"
 fi
 
