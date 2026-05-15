@@ -1,4 +1,5 @@
 env
 conf.d
-.zsh_secrets
 format_grep.awk
+.zsh_secrets
+.zsh_plugins.txt
