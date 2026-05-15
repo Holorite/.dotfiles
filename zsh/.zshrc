@@ -97,7 +97,7 @@ fi
 export PATH="$HOME/.local/bin:$PATH"
 
 script_dir="$(dirname "$(readlink -f "${HOME}/.zshrc")")"
-source $script_dir/.zsh_secrets
+[[ -f "$script_dir/.zsh_secrets" ]] && source $script_dir/.zsh_secrets
 
 # You may need to manually set your language environment
 # export LANG=en_US.UTF-8
