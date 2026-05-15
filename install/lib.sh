@@ -28,6 +28,14 @@ ensure_eget() {
     info "eget installed at $EGET"
 }
 
+# Wrap eget with anti-match filters for distro-package assets we never want
+# in ~/.local/bin. Multiple GitHub releases ship .deb/.rpm/.apk alongside the
+# portable archive, which would otherwise trip eget's interactive disambig
+# prompt. Callers can still pass extra --asset filters on top.
+eget_install() {
+    "$EGET" --asset ^.deb --asset ^.rpm --asset ^.apk "$@"
+}
+
 # ── brew (Linuxbrew, home env only) ────────────────────────────────────────────
 export BREW="${BREW:-}"
 

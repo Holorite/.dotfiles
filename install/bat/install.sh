@@ -7,7 +7,7 @@ if should_install bat bat --version; then
     info "Installing bat..."
     if ! try_brew bat; then
         ensure_eget
-        "$EGET" sharkdp/bat --to "$BIN_DIR" --file bat
+        eget_install sharkdp/bat --to "$BIN_DIR" --asset gnu --file bat
     fi
     info "bat installed"
 fi

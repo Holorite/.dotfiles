@@ -6,7 +6,7 @@ if should_install gotop gotop -V; then
     info "Installing gotop..."
     if ! try_brew gotop; then
         ensure_eget
-        "$EGET" xxxserxxx/gotop --to "$BIN_DIR" --file gotop
+        eget_install xxxserxxx/gotop --to "$BIN_DIR" --file gotop
     fi
     info "gotop installed"
 fi

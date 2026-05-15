@@ -6,7 +6,7 @@ if should_install nvim nvim --version; then
     info "Installing neovim..."
     if ! try_brew neovim; then
         ensure_eget
-        "$EGET" neovim/neovim --asset appimage --to "$BIN_DIR/nvim"
+        eget_install neovim/neovim --asset appimage --asset "$(uname -m)" --to "$BIN_DIR/nvim"
         chmod +x "$BIN_DIR/nvim"
     fi
     info "neovim installed"

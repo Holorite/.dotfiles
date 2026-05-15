@@ -7,7 +7,7 @@ if should_install tmux tmux -V; then
     info "Installing tmux..."
     if ! try_brew tmux; then
         ensure_eget
-        "$EGET" nelsonenzo/tmux-appimage --to "$BIN_DIR/tmux"
+        eget_install nelsonenzo/tmux-appimage --to "$BIN_DIR/tmux"
         chmod +x "$BIN_DIR/tmux"
     fi
     info "tmux installed"

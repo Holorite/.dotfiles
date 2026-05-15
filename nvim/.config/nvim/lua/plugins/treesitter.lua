@@ -1,16 +1,15 @@
 return {
     {
         "nvim-treesitter/nvim-treesitter",
+        branch = "main",
         lazy = false,
-        tag = "v0.9.3", -- 1.0 removes the nvim-treesitter.configs interface, needs api update here
         build = ":TSUpdate",
         config = function()
-            require('nvim-treesitter.configs').setup({
-                ensure_installed = { "c", "cpp", "lua", "vim", "vimdoc", "python" , "typescript", "tsx", "javascript", "html", "css", "markdown", "markdown_inline", "bash" },
-                highlight = {
-                    enable = true,
-                    additional_vim_regex_highlighting = false,
-                },
+            local parsers = { "c", "cpp", "lua", "vim", "vimdoc", "python", "typescript", "tsx", "javascript", "html", "css", "markdown", "markdown_inline", "bash" }
+            require("nvim-treesitter").install(parsers)
+            vim.api.nvim_create_autocmd("FileType", {
+                pattern = parsers,
+                callback = function() pcall(vim.treesitter.start) end,
             })
         end,
     },
