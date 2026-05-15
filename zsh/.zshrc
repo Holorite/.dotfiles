@@ -1,23 +1,22 @@
-DOTFILES_ZSH="$(dirname "$(readlink -f "${HOME}/.zshrc")")"
+DOTFILES_ZSH="$(dirname "$(readlink -f "$HOME/.zshrc")")"
 DOTFILES_DIR="$(dirname "$DOTFILES_ZSH")"
 
-# Environment detection
+# ── Environment ──────────────────────────────────────────────
 if [[ -f "$HOME/.dotfiles_env" ]]; then
-    export DOTFILES_ENV=$(< "$HOME/.dotfiles_env")
+    export DOTFILES_ENV="$(<"$HOME/.dotfiles_env")"
 else
     export DOTFILES_ENV="default"
 fi
 
-# Utils
+# ── Utils ────────────────────────────────────────────────────
 source "$DOTFILES_DIR/.utils.sh"
 
-# Path
+# ── Path ─────────────────────────────────────────────────────
 export PATH="$HOME/.local/bin:$PATH"
 
-# Secrets
-[[ -f "$DOTFILES_ZSH/.zsh_secrets" ]] && source $DOTFILES_ZSH/.zsh_secrets
+# ── Plugins ──────────────────────────────────────────────────
+# Static-file fast path: rebundle only when .zsh_plugins.txt changes.
 
-# Plugins (static-file fast path: regenerate only when .zsh_plugins.txt changes)
 zvm_after_init_commands+=('[ -f ~/.fzf.zsh ] && source ~/.fzf.zsh')
 zvm_after_init_commands+=('source <(fzf --zsh)')
 
@@ -28,25 +27,33 @@ zsh_plugins_zsh="$HOME/.zsh_plugins.zsh"
 if use_brew; then
     fpath=(/home/linuxbrew/.linuxbrew/opt/antidote/share/antidote/functions $fpath)
 else
-    fpath=($HOME/.antidote/functions $fpath)
+    fpath=("$HOME/.antidote/functions" $fpath)
 fi
 autoload -Uz antidote
 
-# Rebuild bundle on missing or .txt change
-if [[ ! ${zsh_plugins_zsh} -nt ${zsh_plugins_txt} ]]; then
-    antidote bundle <${zsh_plugins_txt} >|${zsh_plugins_zsh}
+# Rebuild bundle when missing or when the plugin list is newer.
+if [[ ! "$zsh_plugins_zsh" -nt "$zsh_plugins_txt" ]]; then
+    antidote bundle <"$zsh_plugins_txt" >|"$zsh_plugins_zsh"
 fi
 
-# Source bundle
-source ${zsh_plugins_zsh}
+source "$zsh_plugins_zsh"
 unset zsh_plugins_txt zsh_plugins_zsh
 
+# ── Config ----------─────────────────────────────────────────
+
+# Secrets
+[[ -f "$DOTFILES_ZSH/.zsh_secrets" ]] && source "$DOTFILES_ZSH/.zsh_secrets"
+
 # Config fragments
-for f in ${DOTFILES_ZSH}/conf.d/*.zsh; do source "$f"; done
+for fragment in "$DOTFILES_ZSH"/conf.d/*.zsh; do
+    source "$fragment"
+done
+unset fragment
 
-# Environment specific overrides
-_env_file="${DOTFILES_ZSH}/env/${DOTFILES_ENV}.zsh"
-[[ -f "$_env_file" ]] && source "$_env_file"
+# Environment overrides
+env_file="$DOTFILES_ZSH/env/$DOTFILES_ENV.zsh"
+[[ -f "$env_file" ]] && source "$env_file"
+unset env_file
 
-# Tools
+# ── Prompt ───────────────────────────────────────────────────
 eval "$(starship init zsh)"
