@@ -5,13 +5,15 @@ source "$(dirname "$0")/../lib.sh"
 # ── bat ────────────────────────────────────────────────────────────────────────
 if should_install bat bat --version; then
     info "Installing bat..."
-    ensure_eget
-    "$EGET" sharkdp/bat --to "$BIN_DIR" --file bat
+    if ! try_brew bat; then
+        ensure_eget
+        "$EGET" sharkdp/bat --to "$BIN_DIR" --file bat
+    fi
     info "bat installed"
 fi
 
 # ── Tokyo Night theme ──────────────────────────────────────────────────────────
-config_dir="$("$BIN_DIR/bat" --config-dir)"
+config_dir="$(bat --config-dir)"
 theme_path="$config_dir/themes/tokyonight_night.tmTheme"
 config_file="$config_dir/config"
 
@@ -21,7 +23,7 @@ if should_install_path "Tokyo Night theme" "$theme_path"; then
     curl -sL -o "$theme_path" \
         https://raw.githubusercontent.com/folke/tokyonight.nvim/main/extras/sublime/tokyonight_night.tmTheme \
         || error "Failed to download Tokyo Night theme"
-    "$BIN_DIR/bat" cache --build
+    bat cache --build
     info "Tokyo Night theme installed"
 fi
 

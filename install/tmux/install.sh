@@ -5,9 +5,11 @@ source "$(dirname "$0")/../lib.sh"
 # ── tmux ───────────────────────────────────────────────────────────────────────
 if should_install tmux tmux -V; then
     info "Installing tmux..."
-    ensure_eget
-    "$EGET" nelsonenzo/tmux-appimage --to "$BIN_DIR/tmux"
-    chmod +x "$BIN_DIR/tmux"
+    if ! try_brew tmux; then
+        ensure_eget
+        "$EGET" nelsonenzo/tmux-appimage --to "$BIN_DIR/tmux"
+        chmod +x "$BIN_DIR/tmux"
+    fi
     info "tmux installed"
 fi
 

@@ -34,6 +34,9 @@ DOTFILES_ENV=$(cat ~/.dotfiles_env)
 export DOTFILES_ENV
 info "DOTFILES_ENV=$DOTFILES_ENV"
 
+# Bootstrap brew up-front on home so subsequent installers find it on PATH.
+ensure_brew || true
+
 # ── Installers ─────────────────────────────────────────────────────────────────
 INSTALLERS=()
 for dir in "$SCRIPT_DIR"/install/*/; do

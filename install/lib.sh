@@ -9,6 +9,7 @@ error() { echo -e "${RED}[error]${NC} $1"; exit 1; }
 # ── Bin dir ────────────────────────────────────────────────────────────────────
 BIN_DIR="$HOME/.local/bin"
 mkdir -p "$BIN_DIR"
+[[ ":$PATH:" == *":$BIN_DIR:"* ]] || export PATH="$BIN_DIR:$PATH"
 
 # ── eget ───────────────────────────────────────────────────────────────────────
 EGET="$BIN_DIR/eget"
@@ -25,6 +26,40 @@ ensure_eget() {
     mv "$tmp/eget" "$EGET"
     rm -rf "$tmp"
     info "eget installed at $EGET"
+}
+
+# ── brew (Linuxbrew, home env only) ────────────────────────────────────────────
+export BREW="${BREW:-}"
+
+ensure_brew() {
+    [[ "${DOTFILES_ENV:-}" == "home" ]] || return 1
+    if [[ -n "$BREW" && -x "$BREW" ]]; then
+        return 0
+    fi
+    local candidate
+    for candidate in /home/linuxbrew/.linuxbrew/bin/brew "$HOME/.linuxbrew/bin/brew"; do
+        if [[ -x "$candidate" ]]; then
+            BREW="$candidate"
+            eval "$("$BREW" shellenv)"
+            return 0
+        fi
+    done
+    info "Bootstrapping Linuxbrew..."
+    NONINTERACTIVE=1 bash -c \
+        "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)" \
+        || error "brew bootstrap failed"
+    BREW=/home/linuxbrew/.linuxbrew/bin/brew
+    [[ -x "$BREW" ]] || error "brew not found at $BREW after bootstrap"
+    eval "$("$BREW" shellenv)"
+}
+
+# Try to install via brew. Returns 0 on success, 1 if env != home (caller falls
+# back). brew install failures are fatal — opting into brew with a missing
+# formula is a configuration bug, not a transient.
+# Args: <formula> [extra brew install args...]
+try_brew() {
+    ensure_brew || return 1
+    "$BREW" install "$@" || error "brew install $* failed"
 }
 
 # ── Install helpers ────────────────────────────────────────────────────────────
