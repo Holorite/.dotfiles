@@ -41,3 +41,8 @@ alias l='ls -lah'
 alias ll='ls -lh'
 alias la='ls -lAh'
 
+# Git
+alias gst='git st'
+
+# eza
+alias ls='eza --icons'
