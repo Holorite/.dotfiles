@@ -55,7 +55,7 @@ ensure_brew() {
         fi
     done
     info "Bootstrapping Linuxbrew..."
-    NONINTERACTIVE=1 bash -c \
+    bash -c \
         "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)" \
         || error "brew bootstrap failed"
     BREW=/home/linuxbrew/.linuxbrew/bin/brew
