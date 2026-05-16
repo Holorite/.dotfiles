@@ -7,7 +7,7 @@ source "$(dirname "$0")/../lib.sh"
 # Needs >= 0.26.1.
 if should_install tree-sitter tree-sitter --version; then
     info "Installing tree-sitter..."
-    if ! try_brew tree-sitter; then
+    if ! try_brew tree-sitter-cli; then
         ensure_eget
         eget_install tree-sitter/tree-sitter --to "$BIN_DIR" --asset ^cli --file tree-sitter
     fi
