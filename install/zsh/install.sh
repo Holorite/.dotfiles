@@ -43,4 +43,17 @@ if should_install eza eza --version; then
     info "eza installed"
 fi
 
+# ── vivid ──────────────────────────────────────────────────────────────────────
+# Generates LS_COLORS themes so the zsh completion menu matches eza's coloring
+# (see zsh/conf.d/completion.zsh).
+if should_install vivid vivid --version; then
+    info "Installing vivid..."
+    if ! try_brew vivid; then
+        ensure_eget
+        eget_install sharkdp/vivid --asset gnu --to "$BIN_DIR" \
+            || error "Failed to install vivid"
+    fi
+    info "vivid installed"
+fi
+
 info "Done! Open a new shell to get started."
