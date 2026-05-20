@@ -7,6 +7,11 @@ export FZF_DEFAULT_OPTS="$FZF_DEFAULT_OPTS \
     --color=selected-bg:#45475A \
     --color=border:#6C7086,label:#CDD6F4"
 
+# Keybindings + completion. With ZVM_INIT_MODE=sourcing this can load inline
+# instead of via zvm_after_init_commands.
+[[ -f ~/.fzf.zsh ]] && source ~/.fzf.zsh
+command -v fzf >/dev/null && source <(fzf --zsh)
+
 # Tokyo night
 # export FZF_DEFAULT_OPTS="$FZF_DEFAULT_OPTS \
 #   --color=bg+:#283457 \

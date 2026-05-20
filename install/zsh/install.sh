@@ -56,4 +56,19 @@ if should_install vivid vivid --version; then
     info "vivid installed"
 fi
 
+# ── catppuccin theme for fast-syntax-highlighting ──────────────────────────────
+# Drops the four flavor .ini files into ~/.config/fsh/. Activation happens
+# lazily on first shell start (see zsh/conf.d/fsh.zsh).
+if should_install_path "catppuccin fsh theme" ~/.config/fsh/catppuccin-mocha.ini; then
+    info "Installing catppuccin fsh theme..."
+    mkdir -p ~/.config/fsh
+    tmp=$(mktemp -d) || error "Failed to create tempdir"
+    git clone --depth=1 https://github.com/catppuccin/zsh-fsh.git "$tmp" \
+        || { rm -rf "$tmp"; error "Failed to clone catppuccin/zsh-fsh"; }
+    cp "$tmp"/themes/catppuccin-*.ini ~/.config/fsh/ \
+        || { rm -rf "$tmp"; error "Failed to copy fsh themes"; }
+    rm -rf "$tmp"
+    info "catppuccin fsh theme installed"
+fi
+
 info "Done! Open a new shell to get started."
