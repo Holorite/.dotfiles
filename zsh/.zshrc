@@ -18,8 +18,8 @@ export PATH="$HOME/.local/bin:$PATH"
 # Static-file fast path: rebundle only when .zsh_plugins.txt changes.
 
 # Init zsh-vi-mode during plugin sourcing rather than via its post-init hook,
-# so widget-wrapping plugins (fzf, autosuggestions, sage, ...) load normally
-# without needing zvm_after_init_commands workarounds.
+# so widget-wrapping plugins (fzf, autosuggestions, ...) load normally without
+# needing zvm_after_init_commands workarounds.
 ZVM_INIT_MODE=sourcing
 
 zsh_plugins_txt="$DOTFILES_ZSH/.zsh_plugins.txt"
@@ -38,28 +38,7 @@ if [[ ! "$zsh_plugins_zsh" -nt "$zsh_plugins_txt" ]]; then
     antidote bundle <"$zsh_plugins_txt" >|"$zsh_plugins_zsh"
 fi
 
-# Pre-define _sage_orig_<widget> as user widgets pointing at the builtin
-# `.widget` form, before zsh-sage initializes. zsh-sage normally creates these
-# via `zle -A self-insert _sage_orig_self-insert`, which leaves the widget
-# typed `builtin` in $widgets — and fast-syntax-highlighting then generates a
-# wrapper that calls `._sage_orig_self-insert`, which isn't a real builtin
-# (cue "no such widget" on the first keystroke). Pre-binding as user widgets
-# keeps fsh on its `user:*` branch and sage's existence check skips the alias.
-for _w in self-insert forward-char forward-word accept-line \
-          expand-or-complete backward-kill-word backward-delete-char \
-          bracketed-paste; do
-    eval "_sage_orig_passthrough_${_w//-/_}() { zle .${_w}; }"
-    zle -N "_sage_orig_$_w" "_sage_orig_passthrough_${_w//-/_}"
-done
-unset _w
-
-# Source the bundle inside an anonymous function so `local_options` applies.
-# `no_monitor` suppresses the `[N] PID` job-start line that zsh-sage's coproc
-# would otherwise print at first source (it kicks the coproc during init).
-() {
-    setopt local_options no_monitor
-    source "$zsh_plugins_zsh"
-}
+source "$zsh_plugins_zsh"
 unset zsh_plugins_txt zsh_plugins_zsh
 
 # ── Config ----------─────────────────────────────────────────
@@ -80,5 +59,3 @@ unset env_file
 
 # ── Prompt ───────────────────────────────────────────────────
 eval "$(starship init zsh)"
-
-export ZSH_SAGE_AI_ENABLED=true
