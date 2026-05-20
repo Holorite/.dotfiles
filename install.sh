@@ -69,6 +69,11 @@ case "$target" in
             run_installer "$name"
         done
         ;;
+    missing)
+        for name in "${INSTALLERS[@]}"; do
+            REINSTALL=0 run_installer "$name"
+        done
+        ;;
     all-confirm)
         for name in "${INSTALLERS[@]}"; do
             printf "Install %s? [Y/n] " "$name"

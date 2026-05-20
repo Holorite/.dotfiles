@@ -80,6 +80,8 @@ _should_install_prompt() {
     local name="$1"
     if [[ "${REINSTALL:-}" == "1" ]]; then
         return 0
+    elif [[ "${REINSTALL:-}" == "0" ]]; then
+        return 1
     fi
     if [[ ! -t 0 ]]; then
         return 1
@@ -108,8 +110,17 @@ should_install() {
 # Decide whether to install something rooted at a path.
 # Args: <name> <path>
 should_install_path() {
-    local name="$1" path="$2"
-    if [[ ! -e "$path" ]]; then
+    local name="$1" 
+    shift
+    paths=("$@")
+    local missing=1
+    for path in "${paths[@]}"; do
+        if [[ -e "$path" ]]; then
+            missing=0
+            break
+        fi
+    done
+    if [[ $missing -eq 1 ]]; then
         return 0
     fi
     info "$name already installed"

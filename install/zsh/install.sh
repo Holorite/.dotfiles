@@ -13,7 +13,7 @@ if should_install zsh zsh --version; then
 fi
 
 # ── Antidote ───────────────────────────────────────────────────────────────────
-if should_install_path Antidote ~/.antidote; then
+if should_install_path Antidote ~/.antidote /home/linuxbrew/.linuxbrew/Cellar/antidote; then
     info "Installing Antidote..."
     if ! try_brew antidote; then
         rm -rf ~/.antidote
