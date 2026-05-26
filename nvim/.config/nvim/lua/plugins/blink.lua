@@ -32,7 +32,7 @@ return {
             -- set to 'none' to disable the 'default' preset
             preset = 'default',
 
-            ['<M-l>'] = { 'select_and_accept', 'fallback' },
+            ['<M-p>'] = { 'select_and_accept', 'fallback' },
             ['<C-e>'] = false,
         },
 
