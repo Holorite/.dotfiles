@@ -1,0 +1,36 @@
+{
+  "model": "opus[1m]",
+  "enabledPlugins": {
+    "clangd-lsp@claude-plugins-official": true,
+    "claude-md-management@claude-plugins-official": true,
+    "pyright-lsp@claude-plugins-official": true
+  },
+  "effortLevel": "high",
+  "theme": "dark-ansi",
+  "hooks": {
+      "UserPromptSubmit": [
+          {
+              "matcher": "",
+              "hooks": [
+                  { "type": "command", "command": "~/.config/tmux/claude-agents/reporter.sh working" }
+              ]
+          }
+      ],
+      "Stop": [
+          {
+              "matcher": "",
+              "hooks": [
+                  { "type": "command", "command": "~/.config/tmux/claude-agents/reporter.sh done" }
+              ]
+          }
+      ],
+      "Notification": [
+          {
+              "matcher": "",
+              "hooks": [
+                  { "type": "command", "command": "~/.config/tmux/claude-agents/reporter.sh waiting" }
+              ]
+          }
+      ]
+  }
+}

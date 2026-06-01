@@ -1,0 +1,28 @@
+{
+  "hooks": {
+    "UserPromptSubmit": [
+      {
+        "matcher": "",
+        "hooks": [
+          { "type": "command", "command": "~/.config/tmux/claude-agents/reporter.sh working" }
+        ]
+      }
+    ],
+    "Stop": [
+      {
+        "matcher": "",
+        "hooks": [
+          { "type": "command", "command": "~/.config/tmux/claude-agents/reporter.sh done" }
+        ]
+      }
+    ],
+    "Notification": [
+      {
+        "matcher": "",
+        "hooks": [
+          { "type": "command", "command": "~/.config/tmux/claude-agents/reporter.sh waiting" }
+        ]
+      }
+    ]
+  }
+}

@@ -97,6 +97,9 @@ fi
 
 # ── stow ───────────────────────────────────────────────────────────────────────
 stow -d "$SCRIPT_DIR" -t "$HOME" nvim zsh git tmux
+if [[ "$DOTFILES_ENV" != "home" ]]; then
+    stow -d "$SCRIPT_DIR" -t "$HOME" claude
+fi
 
 # ── Env-specific gitconfig ─────────────────────────────────────────────────────
 if [[ -f "$SCRIPT_DIR/git/.gitconfig.$DOTFILES_ENV" ]]; then
