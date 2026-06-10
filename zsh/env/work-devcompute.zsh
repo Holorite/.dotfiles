@@ -1,10 +1,5 @@
 # work-devcompute environment (hu-juliray-lv, /mlsys/lasvegas/scratch)
 #
-export XDG_DATA_HOME=/local/mnt/workspace/juliray/.local/share
-export XDG_CACHE_HOME=/local/mnt/workspace/juliray/.cache
-export XDG_STATE_HOME=/local/mnt/workspace/juliray/.local/state
-export NPM_CONFIG_CACHE=/local/mnt/workspace/juliray/.cache/npm
-
 alias scratch="cd /prj/qct/mlsys/lasvegas/scratch/juliray/"
 hash -d lwork=/local/mnt/workspace/juliray
 hash -d envs=/local/mnt/workspace/juliray/envs

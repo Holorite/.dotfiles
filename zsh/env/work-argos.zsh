@@ -1,8 +1,3 @@
-export XDG_DATA_HOME=/prj/qct/mlsys/markham/scratch/juliray/.local/share
-export XDG_CACHE_HOME=/prj/qct/mlsys/markham/scratch/juliray/.cache
-export XDG_STATE_HOME=/prj/qct/mlsys/markham/scratch/juliray/.local/state
-export NPM_CONFIG_CACHE=/prj/qct/mlsys/markham/scratch/juliray/.cache/npm
-
 export RUSTUP_HOME=/prj/qct/mlsys/markham/scratch/juliray/.rustup
 export CARGO_HOME=/prj/qct/mlsys/markham/scratch/juliray/.cargo
 if [ -d $CARGO_HOME ]; then
