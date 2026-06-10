@@ -1,4 +1,4 @@
-export NVM_DIR="$HOME/.nvm"
+export NVM_DIR="$(nvm_dir)"
 
 # Put the latest nvm-installed node on PATH without sourcing nvm.sh
 # (sourcing nvm.sh runs nvm_auto and adds ~1.3s to shell startup).

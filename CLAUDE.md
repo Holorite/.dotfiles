@@ -25,6 +25,7 @@ First run prompts for an environment and writes the choice to `~/.dotfiles_env`.
 
 - `install/lib.sh:ensure_brew` — Linuxbrew is bootstrapped/used only when `use_brew` returns true (currently `home`). `try_brew` returns 1 elsewhere so installers fall back to `eget`.
 - `.utils.sh` (repo root, non-stowed) defines `use_brew()` — the canonical brew-vs-fallback gate. Sourced by both `install/lib.sh` and `zsh/.zshrc` so installers and the live shell agree. Use it instead of inlining the env check.
+- `.utils.sh` also defines `nvm_dir()` — the canonical nvm-location gate, used by both `install/nvm/install.sh` and `zsh/conf.d/nvm.zsh`. On work envs the small home dir can't hold node versions, so nvm lives on the big volume: `/local/mnt/workspace/juliray/.nvm` (devcompute), `/prj/qct/mlsys/markham/scratch/juliray/.nvm` (argos), `$HOME/.nvm` elsewhere.
 - `zsh/env/<env>.zsh` is sourced after `conf.d/*.zsh` for env-specific paths/aliases.
 - `git/.gitconfig.<env>` is symlinked to `~/.gitconfig.local` (included by `git/.gitconfig`).
 - `init.lua` configures `clangd` to run via `./run-in-docker` on the work envs, plain `clangd` on home.
