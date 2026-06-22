@@ -34,6 +34,7 @@ First run prompts for an environment and writes the choice to `~/.dotfiles_env`.
 - `init.lua` configures `clangd` to run via `./run-in-docker` on the work envs, plain `clangd` on home.
 - `install/claude-code/install.sh` runs only on the work envs (it pulls Claude Code from Qualcomm's internal qgenie installer and registers the Tavily search MCP, both corp-network-only). It gates with an explicit `case "${DOTFILES_ENV:-}"` rather than a `.utils.sh` helper, since the condition (work-only) doesn't match `use_brew`'s home-only sense — follow this `case` pattern for other work-only installers.
 - `install/work-vault/install.sh` also runs only on the work envs (same `case` pattern — the vault remote is a private repo on GHE, `github.qualcomm.com`, corp-network-only). Clones/creates the work-vault repo to `$(workspace_dir)/work-vault` — see the **work-vault** section below.
+- `install/claude-squad/install.sh` installs [claude-squad](https://github.com/smtg-ai/claude-squad) (the `cs` binary, a TUI for running several Claude Code/agent sessions in parallel) via the `eget` fallback. It gates the *opposite* way from the work-only installers — an `if [[ "$DOTFILES_ENV" == "home" ]]` early-skip, so it runs on both work envs but not the laptop. Use this skip-home shape (rather than the work-only `case`) for tools that are wanted everywhere except `home`.
 
 When adding env-conditional logic, follow these existing seams rather than introducing new env checks.
 
@@ -71,6 +72,12 @@ A git-synced Obsidian vault that doubles as Claude's structured working-context 
 ## Neovim layout
 
 `nvim/.config/nvim/` is stow-ed to `~/.config/nvim`. `init.lua` sets options/keymaps and bootstraps `lazy.nvim` via `lua/config/lazy.lua`; each plugin spec is its own file under `lua/plugins/`. `lazy-lock.json` is committed.
+
+`lua/plugins/obsidian.lua` integrates `obsidian-nvim/obsidian.nvim` (the maintained community fork) for navigating and authoring vault notes in nvim. It resolves the vault path from `vim.env.WORK_VAULT_DIR` (the same seam as the CLI/zsh/agents) and is **conditionally loaded** via a `cond` closure that verifies both the env var and the directory exist — so it self-disables on envs without the vault. Key design decisions:
+- `disable_frontmatter = true` — obsidian.nvim must not rewrite frontmatter on save (the `work-vault reindex` CLI owns the `type/project/gist` schema).
+- `ui = { enable = false }` — markview.nvim already handles rendering; don't double-conceal.
+- Templates (`templates/` in the vault) provide the correct frontmatter skeleton for `:ObsidianNew` so notes are created `reindex`-compatible — the user fills in `project:` and `gist:` after creation.
+- Keymaps under `<leader>o` (quick-switch, search, backlinks, follow-link, new).
 
 ## Repo-specific git config
 
