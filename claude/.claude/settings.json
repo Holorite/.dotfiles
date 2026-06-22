@@ -1,5 +1,10 @@
 {
-  "model": "claude-opus-4-7",
+  "permissions": {
+    "deny": [
+      "WebSearch"
+    ]
+  },
+  "model": "claude-opus-4-8",
   "hooks": {
     "UserPromptSubmit": [
       {
@@ -33,11 +38,6 @@
           }
         ]
       }
-    ]
-  },
-  "permissions": {
-    "deny": [
-      "WebSearch"
     ]
   },
   "enabledPlugins": {

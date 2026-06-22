@@ -1,0 +1,292 @@
+#!/usr/bin/env bash
+# work-vault — thin CLI over the git-synced Obsidian work-vault.
+#
+# Keeps the Claude slash commands (vault-save/load/project) and the
+# vault-explorer agent declarative: they call these subcommands instead of
+# re-deriving the vault path, the project slug, or the git-sync incantation.
+# The vault layout (folders by note *type*, files prefixed by project slug so
+# wikilinks stay unambiguous) lives here as the single source of truth:
+#
+#   index.md                          top MOC → links every project MOC
+#   projects/<slug>.md                per-project MOC → links its notes
+#   explorations/<slug>--<topic>.md
+#   plans/<slug>--<topic>.md
+#   tasks/<slug>--<topic>--<n>.md
+#
+# The vault dir comes from $WORK_VAULT_DIR (exported by zsh/conf.d/work-vault.zsh
+# from work_vault_dir() in .utils.sh). Created on work envs by
+# install/work-vault/install.sh.
+set -euo pipefail
+
+# Resolve the vault dir. Prefer the exported env var; fall back to the .utils.sh
+# seam so the script works even when invoked outside an interactive shell (e.g.
+# from a Claude tool call that didn't inherit the export).
+vault_dir() {
+    if [[ -n "${WORK_VAULT_DIR:-}" ]]; then
+        echo "$WORK_VAULT_DIR"
+        return
+    fi
+    local utils="$HOME/.dotfiles/.utils.sh"
+    if [[ -r "$utils" ]]; then
+        # shellcheck source=/dev/null
+        source "$utils" && work_vault_dir && return
+    fi
+    echo "$HOME/work-vault"
+}
+
+VAULT="$(vault_dir)"
+
+die() { echo "work-vault: $*" >&2; exit 1; }
+
+require_vault() {
+    [[ -d "$VAULT" ]] || die "vault not found at $VAULT (run ./install.sh work-vault)"
+}
+
+# Derive a stable project slug from the current directory: the git remote repo
+# name if we're in a repo, else the toplevel dir name. Lowercased, non-alnum
+# collapsed to single dashes. This is what makes "point me at this project's
+# notes" automatic — the slug keys the project MOC.
+cmd_slug() {
+    local raw
+    if raw="$(git rev-parse --show-toplevel 2>/dev/null)"; then
+        local remote
+        if remote="$(git config --get remote.origin.url 2>/dev/null)" && [[ -n "$remote" ]]; then
+            raw="${remote##*/}"      # strip path → repo.git
+            raw="${raw%.git}"        # strip .git
+        else
+            raw="${raw##*/}"         # no remote → toplevel dir name
+        fi
+    else
+        raw="${PWD##*/}"             # not a repo → cwd name
+    fi
+    # normalize: lowercase, non-alnum → '-', squeeze, trim
+    echo "$raw" \
+        | tr '[:upper:]' '[:lower:]' \
+        | sed -E 's/[^a-z0-9]+/-/g; s/^-+//; s/-+$//'
+}
+
+# Print the vault dir (callers cd into it / read from it).
+cmd_dir() {
+    require_vault
+    echo "$VAULT"
+}
+
+# Ensure projects/<slug>.md (the project MOC) exists, seeding frontmatter and a
+# backlink to the top index. Idempotent. Prints the MOC's path.
+cmd_moc() {
+    require_vault
+    local slug="${1:-}"
+    [[ -n "$slug" ]] || die "usage: work-vault moc <slug>"
+    local moc="$VAULT/projects/$slug.md"
+    if [[ ! -f "$moc" ]]; then
+        mkdir -p "$VAULT/projects"
+        # created-date is passed by the caller's environment if set, else blank;
+        # we avoid embedding a date here so the file is reproducible.
+        # The auto:* marker pairs delimit the script-managed link lists; reindex
+        # rewrites strictly between them and never touches surrounding prose.
+        cat > "$moc" <<EOF
+---
+type: project-moc
+project: $slug
+status: active
+---
+# $slug
+
+Map of content for **$slug**. Up: [[index]].
+
+## Explorations
+<!-- auto:explorations -->
+<!-- /auto:explorations -->
+
+## Plans
+<!-- auto:plans -->
+<!-- /auto:plans -->
+
+## Tasks
+<!-- auto:tasks -->
+<!-- /auto:tasks -->
+EOF
+    fi
+    echo "$moc"
+}
+
+# Read a single scalar field from a note's leading YAML frontmatter (the block
+# between the first pair of `---` fences). Prints the value with surrounding
+# quotes stripped, or nothing if the field is absent. Kept deliberately simple —
+# our notes use flat `key: value` frontmatter, no nesting.
+fm_field() {
+    local file="$1" key="$2"
+    awk -v key="$key" '
+        NR==1 && $0=="---" { infm=1; next }
+        infm && $0=="---"  { exit }
+        infm {
+            # match `key:` then capture the rest
+            if ($0 ~ "^"key":[[:space:]]*") {
+                sub("^"key":[[:space:]]*", "", $0)
+                # strip matching surrounding quotes
+                gsub(/^"|"$/, "", $0)
+                gsub(/^'\''|'\''$/, "", $0)
+                print
+                exit
+            }
+        }
+    ' "$file"
+}
+
+# Rewrite the marker-bounded region named NAME in FILE with CONTENT (read from
+# stdin). The region is the text strictly between `<!-- auto:NAME -->` and
+# `<!-- /auto:NAME -->`. If the markers are absent but a `## <Heading>` matching
+# the name exists (pre-existing MOC), a filled marker pair is spliced in right
+# after that heading line. Everything outside the region is preserved verbatim.
+replace_region() {
+    local file="$1" name="$2"
+    local content; content="$(cat)"
+    # Heading that this region lives under: capitalize the name.
+    local heading; heading="$(echo "$name" | sed -E 's/^(.)/\U\1/')"
+    local tmp; tmp="$(mktemp)"
+    if grep -qF "<!-- auto:$name -->" "$file"; then
+        # Markers present → replace strictly between them.
+        awk -v name="$name" -v content="$content" '
+            BEGIN { mopen="<!-- auto:" name " -->"; mclose="<!-- /auto:" name " -->" }
+            skipping {
+                if ($0 == mclose) { print mopen; if (content != "") print content; print mclose; skipping=0 }
+                next
+            }
+            $0 == mopen { skipping=1; next }
+            { print }
+        ' "$file" > "$tmp"
+    else
+        # No markers yet → splice a filled pair right after the heading line.
+        awk -v heading="## $heading" -v name="$name" -v content="$content" '
+            BEGIN { mopen="<!-- auto:" name " -->"; mclose="<!-- /auto:" name " -->" }
+            { print }
+            $0 == heading {
+                print mopen
+                if (content != "") print content
+                print mclose
+            }
+        ' "$file" > "$tmp"
+    fi
+    mv "$tmp" "$file"
+}
+
+# Regenerate all script-managed link lists from the filesystem. The notes on
+# disk (named <slug>--<topic>.md in the type folders, each carrying `project:`
+# and optional `gist:` frontmatter) are the single source of truth:
+#   - each project MOC's Explorations/Plans/Tasks lists, and
+#   - index.md's Projects list.
+# Idempotent and safe to run repeatedly. Only the marker-bounded regions change.
+cmd_reindex() {
+    require_vault
+    local -A slugs_seen   # set of slugs that have at least one note or a MOC
+    local folder type_name f base slug gist bullet
+
+    # Build the three per-type lists, bucketed by slug, into temp files keyed
+    # "<slug>:<type>" so we can stream them into replace_region per MOC.
+    local listdir; listdir="$(mktemp -d)"
+    for folder in explorations plans tasks; do
+        [[ -d "$VAULT/$folder" ]] || continue
+        # Sort by filename for deterministic output.
+        while IFS= read -r f; do
+            [[ -e "$f" ]] || continue
+            base="$(basename "$f" .md)"
+            slug="$(fm_field "$f" project)"
+            [[ -n "$slug" ]] || continue
+            gist="$(fm_field "$f" gist)"
+            if [[ -n "$gist" ]]; then
+                bullet="- [[$base]] — $gist"
+            else
+                bullet="- [[$base]]"
+            fi
+            printf '%s\n' "$bullet" >> "$listdir/$slug:$folder"
+            slugs_seen["$slug"]=1
+        done < <(find "$VAULT/$folder" -maxdepth 1 -name '*.md' | sort)
+    done
+
+    # Any existing MOC is also a known slug (so empty projects still get
+    # markers normalized and stay listed in the index).
+    if [[ -d "$VAULT/projects" ]]; then
+        while IFS= read -r f; do
+            [[ -e "$f" ]] || continue
+            slug="$(basename "$f" .md)"
+            slugs_seen["$slug"]=1
+        done < <(find "$VAULT/projects" -maxdepth 1 -name '*.md' | sort)
+    fi
+
+    # Rewrite each MOC's three regions. (Guard the empty case: iterating
+    # ${!arr[@]} on an empty associative array errors under `set -u`.)
+    if (( ${#slugs_seen[@]} )); then
+      for slug in "${!slugs_seen[@]}"; do
+        local moc; moc="$(cmd_moc "$slug")"
+        for type_name in explorations plans tasks; do
+            if [[ -f "$listdir/$slug:$type_name" ]]; then
+                replace_region "$moc" "$type_name" < "$listdir/$slug:$type_name"
+            else
+                replace_region "$moc" "$type_name" < /dev/null
+            fi
+        done
+      done
+    fi
+
+    # Rebuild index.md's Projects list: one bullet per project MOC, sorted,
+    # with the MOC's own optional `gist:` as the description.
+    local index="$VAULT/index.md"
+    if [[ -f "$index" ]]; then
+        local projlist; projlist="$(mktemp)"
+        while IFS= read -r f; do
+            [[ -e "$f" ]] || continue
+            slug="$(basename "$f" .md)"
+            gist="$(fm_field "$f" gist)"
+            if [[ -n "$gist" ]]; then
+                printf '%s\n' "- [[projects/$slug]] — $gist" >> "$projlist"
+            else
+                printf '%s\n' "- [[projects/$slug]]" >> "$projlist"
+            fi
+        done < <(find "$VAULT/projects" -maxdepth 1 -name '*.md' 2>/dev/null | sort)
+        replace_region "$index" "projects" < "$projlist"
+        rm -f "$projlist"
+    fi
+
+    rm -rf "$listdir"
+}
+
+# git add -A && commit && push, all best-effort and quiet on the no-op case.
+# Push failures are non-fatal (offline / first push needs upstream) but reported,
+# so a Claude tool call that can't reach the remote still records locally.
+# reindex runs first so navigation self-heals in the same commit.
+cmd_sync() {
+    require_vault
+    local msg="${1:-vault: update}"
+    cmd_reindex
+    git -C "$VAULT" add -A
+    if git -C "$VAULT" diff --cached --quiet; then
+        echo "work-vault: nothing to sync"
+        return 0
+    fi
+    git -C "$VAULT" commit -q -m "$msg"
+    if ! git -C "$VAULT" push -q 2>/dev/null; then
+        echo "work-vault: committed locally but push failed (offline or no upstream?)" >&2
+    fi
+}
+
+usage() {
+    cat >&2 <<'EOF'
+usage: work-vault <command> [args]
+  dir              print the vault directory (errors if absent)
+  slug             derive the project slug from the current directory
+  moc <slug>       ensure projects/<slug>.md exists; print its path
+  reindex          regenerate all MOC + index link lists from the filesystem
+  sync "<msg>"     reindex, then git add -A && commit && push (best-effort)
+EOF
+    exit 2
+}
+
+case "${1:-}" in
+    dir)     shift; cmd_dir "$@" ;;
+    slug)    shift; cmd_slug "$@" ;;
+    moc)     shift; cmd_moc "$@" ;;
+    reindex) shift; cmd_reindex "$@" ;;
+    sync)    shift; cmd_sync "$@" ;;
+    ""|-h|--help) usage ;;
+    *) die "unknown command: $1 (try --help)" ;;
+esac
