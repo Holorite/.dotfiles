@@ -10,13 +10,14 @@ return {
         "BufReadPre " .. vault .. "/**.md",
         "BufNewFile " .. vault .. "/**.md",
     } or {},
-    cmd = { "ObsidianQuickSwitch", "ObsidianSearch", "ObsidianBacklinks", "ObsidianNew", "ObsidianFollowLink" },
+    cmd = { "Obsidian" },
     dependencies = { "nvim-lua/plenary.nvim" },
     opts = {
         workspaces = { { name = "work-vault", path = vault or "" } },
-        disable_frontmatter = true,
+        frontmatter = { enabled = false },
+        legacy_commands = false,
         ui = { enable = false },
-        completion = { nvim_cmp = false, blink = true, min_chars = 2 },
+        completion = { min_chars = 2 },
         templates = { folder = "templates" },
         note_id_func = function(title)
             if not title or title == "" then return tostring(os.time()) end
@@ -24,10 +25,10 @@ return {
         end,
     },
     keys = {
-        { "<leader>oo", "<cmd>ObsidianQuickSwitch<cr>", desc = "Vault: quick switch" },
-        { "<leader>os", "<cmd>ObsidianSearch<cr>", desc = "Vault: search" },
-        { "<leader>ob", "<cmd>ObsidianBacklinks<cr>", desc = "Vault: backlinks" },
-        { "<leader>of", "<cmd>ObsidianFollowLink<cr>", desc = "Vault: follow link" },
-        { "<leader>on", "<cmd>ObsidianNew<cr>", desc = "Vault: new note" },
+        { "<leader>oo", "<cmd>Obsidian quick_switch<cr>", desc = "Vault: quick switch" },
+        { "<leader>os", "<cmd>Obsidian search<cr>", desc = "Vault: search" },
+        { "<leader>ob", "<cmd>Obsidian backlinks<cr>", desc = "Vault: backlinks" },
+        { "<leader>of", "<cmd>Obsidian follow_link<cr>", desc = "Vault: follow link" },
+        { "<leader>on", "<cmd>Obsidian new<cr>", desc = "Vault: new note" },
     },
 }

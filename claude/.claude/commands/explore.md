@@ -24,7 +24,7 @@ yourself and confirm with the user before dispatching.
    agent prompt must be self-contained: state the subtopic, what to look at,
    and (if code-related) give enough repo context that the agent can orient
    itself. Include: `The project slug for the vault is "<slug>".` (run
-   `work-vault slug` to get this).
+   `vault slug` to get this).
 
 3. **Collect results.** Each agent returns a short summary + vault path. Present
    ALL summaries to the user in a consolidated list (one section per subtopic:

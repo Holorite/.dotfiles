@@ -10,12 +10,12 @@ Argument: `$ARGUMENTS` — a topic slug or fuzzy fragment to match.
 
 ## Steps
 
-1. `vault="$(work-vault dir)"` — if it errors, tell the user the vault isn't
+1. `vault="$(vault dir)"` — if it errors, tell the user the vault isn't
    installed here and stop.
 
 2. **Find candidates**: search `$vault` for notes whose filename or `topic:`
    frontmatter matches `$ARGUMENTS` (case-insensitive, substring). Prefer the
-   current project's slug (`work-vault slug`) when disambiguating.
+   current project's slug (`vault slug`) when disambiguating.
    - 0 matches → list what *is* available for this project (read
      `$vault/projects/<slug>.md`) and ask the user to pick.
    - >1 match → show the matches (path + one-line gist) and ask which.

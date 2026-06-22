@@ -32,11 +32,11 @@ and a short summary from you.
    deep as needed — this is your context, not the main thread's, so depth here
    is free.
 
-2. **Resolve vault coordinates** by running the `work-vault` helper (on PATH):
-   - `slug="$(work-vault slug)"` — the project slug for the current repo.
-   - `work-vault moc "$slug"` — ensures the project MOC exists (idempotent).
-   - `vault="$(work-vault dir)"` — the vault root.
-   If `work-vault dir` errors (vault not installed on this host), STOP and
+2. **Resolve vault coordinates** by running the `vault` helper (on PATH):
+   - `slug="$(vault slug)"` — the project slug for the current repo.
+   - `vault moc "$slug"` — ensures the project MOC exists (idempotent).
+   - `vault="$(vault dir)"` — the vault root.
+   If `vault dir` errors (vault not installed on this host), STOP and
    return a notice saying the vault is unavailable plus your summary inline —
    do not fabricate a path.
 
@@ -70,7 +70,7 @@ and a short summary from you.
    explorations with `[[<slug>--<other-topic>]]` when relevant — you are
    building a graph, not isolated files.
 
-4. **Sync**: run `work-vault sync "vault: explore <slug>/<topic>"`. This
+4. **Sync**: run `vault sync "vault: explore <slug>/<topic>"`. This
    regenerates the project MOC's link lists from the notes on disk — you do
    **not** hand-edit the MOC; the bullet comes from your note's `gist:`
    frontmatter. A failed push is non-fatal — the note is still committed locally.

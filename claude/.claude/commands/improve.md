@@ -20,7 +20,7 @@ with comma-separated subtopics).
 
 2. **Fan out vault-explorer agents** — one per subtopic, all in parallel. Each
    agent prompt must be self-contained. Include: `The project slug for the vault
-   is "<slug>".` (run `work-vault slug` to get this).
+   is "<slug>".` (run `vault slug` to get this).
 
 3. **Collect and present** all summaries to the user (one section per subtopic:
    heading, summary lines, vault path).

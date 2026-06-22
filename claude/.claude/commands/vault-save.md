@@ -13,10 +13,10 @@ omitted).
 
 ## Steps
 
-1. **Resolve coordinates** (the `work-vault` helper is on PATH):
-   - `vault="$(work-vault dir)"` — if this errors, tell the user the vault isn't
+1. **Resolve coordinates** (the `vault` helper is on PATH):
+   - `vault="$(vault dir)"` — if this errors, tell the user the vault isn't
      installed on this host (`./install.sh work-vault`) and stop.
-   - `slug="$(work-vault slug)"`, then `work-vault moc "$slug"` to ensure the
+   - `slug="$(vault slug)"`, then `vault moc "$slug"` to ensure the
      project MOC exists.
 
 2. **Pick the folder** from `<kind>`: `plan`→`plans/`, `exploration`→
@@ -32,7 +32,7 @@ omitted).
    it well. Reference code as `file_path:line`. Wikilink related vault notes
    with `[[...]]`.
 
-4. **Sync**: `work-vault sync "vault: save <slug>/<topic>"`. This regenerates the
+4. **Sync**: `vault sync "vault: save <slug>/<topic>"`. This regenerates the
    project MOC's link lists (and the top index) from the notes on disk — you do
    **not** hand-edit the MOC; navigation is script-derived from each note's
    `project:`/`gist:` frontmatter.

@@ -9,14 +9,14 @@ exploration, plan, and task for it. This is the "point me at this project's
 notes" entry point.
 
 Argument: `$ARGUMENTS` — optional project slug. If omitted, derive it from the
-current repo via `work-vault slug`.
+current repo via `vault slug`.
 
 ## Steps
 
-1. `vault="$(work-vault dir)"` — if it errors, tell the user the vault isn't
+1. `vault="$(vault dir)"` — if it errors, tell the user the vault isn't
    installed here and stop.
 
-2. `slug="${ARGUMENTS:-$(work-vault slug)}"`, then `work-vault moc "$slug"` to
+2. `slug="${ARGUMENTS:-$(vault slug)}"`, then `vault moc "$slug"` to
    ensure `$vault/projects/<slug>.md` exists.
 
 3. **Read and present** the MOC: list its linked explorations / plans / tasks

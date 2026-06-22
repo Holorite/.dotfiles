@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# work-vault — thin CLI over the git-synced Obsidian work-vault.
+# vault — thin CLI over the git-synced Obsidian work-vault.
 #
 # Keeps the Claude slash commands (vault-save/load/project) and the
 # vault-explorer agent declarative: they call these subcommands instead of
@@ -36,7 +36,7 @@ vault_dir() {
 
 VAULT="$(vault_dir)"
 
-die() { echo "work-vault: $*" >&2; exit 1; }
+die() { echo "vault: $*" >&2; exit 1; }
 
 require_vault() {
     [[ -d "$VAULT" ]] || die "vault not found at $VAULT (run ./install.sh work-vault)"
@@ -76,7 +76,7 @@ cmd_dir() {
 cmd_moc() {
     require_vault
     local slug="${1:-}"
-    [[ -n "$slug" ]] || die "usage: work-vault moc <slug>"
+    [[ -n "$slug" ]] || die "usage: vault moc <slug>"
     local moc="$VAULT/projects/$slug.md"
     if [[ ! -f "$moc" ]]; then
         mkdir -p "$VAULT/projects"
@@ -260,23 +260,54 @@ cmd_sync() {
     cmd_reindex
     git -C "$VAULT" add -A
     if git -C "$VAULT" diff --cached --quiet; then
-        echo "work-vault: nothing to sync"
+        echo "vault: nothing to sync"
         return 0
     fi
     git -C "$VAULT" commit -q -m "$msg"
     if ! git -C "$VAULT" push -q 2>/dev/null; then
-        echo "work-vault: committed locally but push failed (offline or no upstream?)" >&2
+        echo "vault: committed locally but push failed (offline or no upstream?)" >&2
     fi
+}
+
+cmd_delete() {
+    require_vault
+    local target="${1:-}"
+    [[ -n "$target" ]] || die "usage: vault delete <path>"
+    local resolved=""
+    # Absolute path
+    if [[ "$target" = /* ]]; then
+        resolved="$target"
+    # Vault-relative path
+    elif [[ -f "$VAULT/$target" ]]; then
+        resolved="$VAULT/$target"
+    # Bare name: search type folders
+    else
+        local f
+        for f in "$VAULT"/{explorations,plans,tasks,projects}/"$target" \
+                 "$VAULT"/{explorations,plans,tasks,projects}/"$target.md"; do
+            if [[ -f "$f" ]]; then
+                resolved="$f"
+                break
+            fi
+        done
+    fi
+    [[ -n "$resolved" && -f "$resolved" ]] || die "note not found: $target"
+    # Safety: must be inside vault
+    [[ "$resolved" = "$VAULT"/* ]] || die "path is outside the vault: $resolved"
+    local relpath="${resolved#"$VAULT"/}"
+    rm "$resolved"
+    cmd_sync "vault: delete $relpath"
 }
 
 usage() {
     cat >&2 <<'EOF'
-usage: work-vault <command> [args]
+usage: vault <command> [args]
   dir              print the vault directory (errors if absent)
   slug             derive the project slug from the current directory
   moc <slug>       ensure projects/<slug>.md exists; print its path
   reindex          regenerate all MOC + index link lists from the filesystem
   sync "<msg>"     reindex, then git add -A && commit && push (best-effort)
+  delete <path>    delete a note (absolute, vault-relative, or bare name) then sync
 EOF
     exit 2
 }
@@ -287,6 +318,7 @@ case "${1:-}" in
     moc)     shift; cmd_moc "$@" ;;
     reindex) shift; cmd_reindex "$@" ;;
     sync)    shift; cmd_sync "$@" ;;
+    delete)  shift; cmd_delete "$@" ;;
     ""|-h|--help) usage ;;
     *) die "unknown command: $1 (try --help)" ;;
 esac

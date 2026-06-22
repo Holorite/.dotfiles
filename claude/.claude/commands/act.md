@@ -16,8 +16,8 @@ user which to act on).
 ## Steps
 
 1. **Load the source material.**
-   - `vault="$(work-vault dir)"` — stop if the vault isn't present.
-   - `slug="$(work-vault slug)"` — current project.
+   - `vault="$(vault dir)"` — stop if the vault isn't present.
+   - `slug="$(vault slug)"` — current project.
    - If `$ARGUMENTS` is given, find the matching note(s) under `$vault`
      (search by filename substring or `topic:` frontmatter, prefer current
      project). If multiple match, ask the user which one(s).
