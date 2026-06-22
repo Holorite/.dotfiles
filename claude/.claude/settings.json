@@ -4,7 +4,6 @@
       "WebSearch"
     ]
   },
-  "model": "claude-opus-4-8",
   "hooks": {
     "UserPromptSubmit": [
       {
@@ -46,5 +45,6 @@
     "pyright-lsp@claude-plugins-official": true
   },
   "effortLevel": "high",
-  "theme": "dark-ansi"
+  "theme": "dark-ansi",
+  "model": "claude-opus-4-6"
 }

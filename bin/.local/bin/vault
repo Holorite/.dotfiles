@@ -7,11 +7,12 @@
 # The vault layout (folders by note *type*, files prefixed by project slug so
 # wikilinks stay unambiguous) lives here as the single source of truth:
 #
-#   index.md                          top MOC → links every project MOC
+#   index.md                          top MOC → links projects + free notes
 #   projects/<slug>.md                per-project MOC → links its notes
 #   explorations/<slug>--<topic>.md
 #   plans/<slug>--<topic>.md
 #   tasks/<slug>--<topic>--<n>.md
+#   <any>.md (vault root or subfolders) free-floating notes (indexed in top MOC)
 #
 # The vault dir comes from $WORK_VAULT_DIR (exported by zsh/conf.d/work-vault.zsh
 # from work_vault_dir() in .utils.sh). Created on work envs by
@@ -245,6 +246,31 @@ cmd_reindex() {
         done < <(find "$VAULT/projects" -maxdepth 1 -name '*.md' 2>/dev/null | sort)
         replace_region "$index" "projects" < "$projlist"
         rm -f "$projlist"
+
+        # Rebuild index.md's Notes list: free-floating notes (any .md not in a
+        # type folder and not index.md itself). Searched recursively but excludes
+        # the machine-managed folders.
+        local noteslist; noteslist="$(mktemp)"
+        while IFS= read -r f; do
+            [[ -e "$f" ]] || continue
+            base="$(basename "$f" .md)"
+            gist="$(fm_field "$f" gist)"
+            if [[ -n "$gist" ]]; then
+                printf '%s\n' "- [[$base]] — $gist" >> "$noteslist"
+            else
+                printf '%s\n' "- [[$base]]" >> "$noteslist"
+            fi
+        done < <(find "$VAULT" -name '*.md' \
+            -not -path "$VAULT/index.md" \
+            -not -path "$VAULT/projects/*" \
+            -not -path "$VAULT/explorations/*" \
+            -not -path "$VAULT/plans/*" \
+            -not -path "$VAULT/tasks/*" \
+            -not -path "$VAULT/templates/*" \
+            -not -path "$VAULT/.obsidian/*" \
+            | sort)
+        replace_region "$index" "notes" < "$noteslist"
+        rm -f "$noteslist"
     fi
 
     rm -rf "$listdir"

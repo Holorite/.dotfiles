@@ -25,10 +25,33 @@ return {
         end,
     },
     keys = {
-        { "<leader>oo", "<cmd>Obsidian quick_switch<cr>", desc = "Vault: quick switch" },
-        { "<leader>os", "<cmd>Obsidian search<cr>", desc = "Vault: search" },
+        { "<leader>oo", function() Snacks.picker.files({ focus = "input", cwd = vault, exclude = { "templates", ".obsidian" } }) end, desc = "Vault: quick switch" },
+        { "<leader>os", function() Snacks.picker.grep({ focus = "input", cwd = vault }) end, desc = "Vault: search" },
         { "<leader>ob", "<cmd>Obsidian backlinks<cr>", desc = "Vault: backlinks" },
         { "<leader>of", "<cmd>Obsidian follow_link<cr>", desc = "Vault: follow link" },
         { "<leader>on", "<cmd>Obsidian new<cr>", desc = "Vault: new note" },
+        {
+            "<leader>od",
+            function()
+                local file = vim.api.nvim_buf_get_name(0)
+                if file == "" or not file:find(vault, 1, true) then
+                    vim.notify("Not a vault note", vim.log.levels.WARN)
+                    return
+                end
+                local name = vim.fn.fnamemodify(file, ":t")
+                if vim.fn.confirm("Delete " .. name .. "?", "&Yes\n&No", 2) ~= 1 then return end
+                vim.fn.system({ "vault", "delete", file })
+                vim.cmd("bdelete!")
+            end,
+            desc = "Vault: delete note",
+        },
+        {
+            "<leader>oS",
+            function()
+                vim.fn.system({ "vault", "sync" })
+                vim.notify("Vault synced", vim.log.levels.INFO)
+            end,
+            desc = "Vault: sync",
+        },
     },
 }
