@@ -96,9 +96,9 @@ if ! command -v stow &>/dev/null; then
 fi
 
 # ── stow ───────────────────────────────────────────────────────────────────────
-stow -d "$SCRIPT_DIR" -t "$HOME" nvim zsh git tmux
+stow -d "$SCRIPT_DIR" -t "$HOME" nvim zsh git tmux bin
 if [[ "$DOTFILES_ENV" != "home" ]]; then
-    stow -d "$SCRIPT_DIR" -t "$HOME" claude
+    stow -d "$SCRIPT_DIR" -t "$HOME" claude ssh
 fi
 
 # ── Env-specific gitconfig ─────────────────────────────────────────────────────

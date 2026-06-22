@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## What this repo is
 
-Personal dotfiles managed with GNU Stow. Top-level package directories (`nvim/`, `zsh/`, `git/`, `tmux/`) mirror `$HOME` layout and are symlinked into place by `stow`. `install/` holds per-tool bootstrap scripts. `windows/` and `windows_setup.ps1` are for Windows Terminal only.
+Personal dotfiles managed with GNU Stow. Top-level package directories (`nvim/`, `zsh/`, `git/`, `tmux/`, `bin/`) mirror `$HOME` layout and are symlinked into place by `stow`. `install/` holds per-tool bootstrap scripts. `windows/` and `windows_setup.ps1` are for the Windows laptop (symlinks the Windows Terminal `settings.json` and installs the `lemonade server` half of the `$BROWSER` setup — see below).
 
 ## Common commands
 
@@ -18,7 +18,7 @@ Personal dotfiles managed with GNU Stow. Top-level package directories (`nvim/`,
 REINSTALL=1 ./install.sh <name>  # force reinstall a tool that's already present
 ```
 
-The stow step always runs at the end and links `nvim zsh git tmux` into `$HOME` (plus `claude` on non-`home` envs).
+The stow step always runs at the end and links `nvim zsh git tmux bin` into `$HOME` (plus `claude` on non-`home` envs). The `bin/` package holds standalone helper scripts that land on `$PATH` via `bin/.local/bin/` (e.g. `browser-open`, the `$BROWSER` wrapper — see below).
 
 ## DOTFILES_ENV
 
@@ -29,6 +29,7 @@ First run prompts for an environment and writes the choice to `~/.dotfiles_env`.
 - `.utils.sh` also defines `workspace_dir()` — the canonical big-disk root for the env (home is small on work hosts): `/local/mnt/workspace/juliray` (devcompute), `/prj/qct/mlsys/markham/scratch/juliray` (argos), `$HOME` elsewhere. Park large/regenerable data here and derive specific paths from it rather than re-checking the env. Built on it: `nvm_dir()` → `$(workspace_dir)/.nvm` (used by `install/nvm/install.sh` and `zsh/conf.d/nvm.zsh`); `zsh/conf.d/python.zsh` exports `PIP_CACHE_DIR`, `UV_CACHE_DIR`, `UV_PYTHON_INSTALL_DIR` under `$(workspace_dir)` to keep pip/uv off home.
 - `zsh/env/<env>.zsh` is sourced after `conf.d/*.zsh` for env-specific paths/aliases.
 - `git/.gitconfig.<env>` is symlinked to `~/.gitconfig.local` (included by `git/.gitconfig`).
+- The `ssh/` package (`ssh/.ssh/config`) is stowed on the work envs only (alongside `claude`), so the repo owns the work `~/.ssh/config`. Because that path is normally a real hand-edited file, `install.sh` moves any pre-existing non-symlink to `~/.ssh/config.pre-stow.bak` before stowing. It carries the `lemonade` `RemoteForward 2489` block (the `$BROWSER` tunnel — see below); the laptop's equivalent is written by `windows_setup.ps1`, not stowed.
 - `init.lua` configures `clangd` to run via `./run-in-docker` on the work envs, plain `clangd` on home.
 - `install/claude-code/install.sh` runs only on the work envs (it pulls Claude Code from Qualcomm's internal qgenie installer and registers the Tavily search MCP, both corp-network-only). It gates with an explicit `case "${DOTFILES_ENV:-}"` rather than a `.utils.sh` helper, since the condition (work-only) doesn't match `use_brew`'s home-only sense — follow this `case` pattern for other work-only installers.
 

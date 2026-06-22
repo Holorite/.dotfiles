@@ -1,0 +1,61 @@
+#!/usr/bin/env bash
+# $BROWSER target for headless / SSH / WSL sessions.
+#
+# Tools like `gh browse`, `xdg-open`, and `python -m webbrowser` just exec
+# "$BROWSER <url>". On these hosts there's no display server, so without this
+# they error out. This wrapper routes the URL to wherever the real browser
+# actually lives, degrading gracefully when it can't:
+#
+#   WSL          -> wslview / explorer.exe         (Windows browser, no daemon)
+#   lemonade     -> lemonade open <url>            (laptop browser, via ssh -R tunnel)
+#   neither/fail -> print an OSC8 clickable link + OSC52 copy to the laptop clipboard
+#
+# Wired up (only when $BROWSER is unset) by zsh/conf.d/browser.zsh. The lemonade
+# path needs `lemonade server` running on the laptop and a RemoteForward of port
+# 2489 in the laptop's ~/.ssh/config — see notes/improvements.md.
+set -euo pipefail
+
+if [[ $# -eq 0 ]]; then
+    echo "usage: browser-open <url> [url...]" >&2
+    exit 2
+fi
+url="$1"
+
+# ── WSL: hand straight to the Windows browser ───────────────────────────────
+if grep -qi microsoft /proc/version 2>/dev/null; then
+    if command -v wslview >/dev/null 2>&1; then
+        exec wslview "$url"
+    elif command -v explorer.exe >/dev/null 2>&1; then
+        # explorer.exe returns nonzero even on success; don't let that abort.
+        explorer.exe "$url" >/dev/null 2>&1 || true
+        exit 0
+    fi
+fi
+
+# ── lemonade: relay to the laptop's browser over the ssh -R tunnel ──────────
+# Succeeds only if `lemonade server` is running on the laptop and the
+# RemoteForward is up; otherwise fall through to the printed-link fallback.
+if command -v lemonade >/dev/null 2>&1; then
+    if lemonade open "$url" 2>/dev/null; then
+        exit 0
+    fi
+fi
+
+# ── Fallback: clickable link + copy to the local clipboard via OSC52 ────────
+# OSC52 = ESC ] 52 ; c ; <base64> BEL. Inside tmux it must be wrapped in a
+# passthrough DCS (relies on `allow-passthrough on`, set in tmux.conf) with the
+# inner ESC bytes doubled, so the OUTER terminal performs the copy regardless of
+# tmux's set-clipboard mode. Best-effort: terminals without OSC52 ignore it, and
+# the printed link is the real fallback.
+b64="$(printf %s "$url" | base64 | tr -d '\n')"
+# shellcheck disable=SC1003  # the \\ is a literal backslash (the ST terminator), not an escaped quote
+if [[ -n "${TMUX:-}" ]]; then
+    printf '\033Ptmux;\033\033]52;c;%s\007\033\\' "$b64" >/dev/tty 2>/dev/null || true
+else
+    printf '\033]52;c;%s\007' "$b64" >/dev/tty 2>/dev/null || true
+fi
+
+# OSC8 hyperlink so the printed URL is click/Cmd-click-able where supported.
+for u in "$@"; do
+    printf '\033]8;;%s\033\\\033[1;34m🔗 %s\033[0m\033]8;;\033\\\n' "$u" "$u"
+done
