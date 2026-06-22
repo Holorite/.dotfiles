@@ -56,6 +56,8 @@ New `install/<name>/install.sh` files must be `chmod +x` — the dispatcher in `
 
 `zsh/.zshrc` is intentionally tiny. It loads, in order: secrets (`zsh/.zsh_secrets`, gitignored) → antidote plugins (`.zsh_plugins.txt`) → every `conf.d/*.zsh` fragment → the matching `env/<DOTFILES_ENV>.zsh` → `starship init`. Add new shell behavior as a fragment in `conf.d/` (general) or `env/` (env-specific), not inline in `.zshrc`.
 
+`zsh/conf.d/notify.zsh` defines `notify [msg]` — POSTs a message to an [ntfy](https://ntfy.sh) topic so a long command can ping your phone/desktop when it finishes (`some-long-build; notify "build done"`). It captures `$?` first, so the title/priority reflect the preceding command's exit status. Config via `~/.zsh_secrets` (gitignored): `NTFY_TOPIC` (required) and `NTFY_URL` (defaults to the public `https://ntfy.sh`). The cross-environment design rationale — why ntfy over OSC escapes / Gotify / chat webhooks, and the eventual click-to-navigate-back plan — lives in `notes/notifications.md`.
+
 ## work-vault (Claude working-context + notes)
 
 A git-synced Obsidian vault that doubles as Claude's structured working-context store and a home for regular notes. It exists to solve two coupled problems (see `notes/improvements.md` §3–4): scattered, undiscoverable handoff markdown, and main-context bloat when several explorations finish. **Three stores, clean boundary:** the vault (live, connected working-context) vs. `notes/` (decisions about *this* repo, committed with it) vs. Claude `memory/` (durable atomic facts).
