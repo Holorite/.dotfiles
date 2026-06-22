@@ -26,17 +26,26 @@ if ($userPath -notlike "*$lemonadeDir*") {
 
 # Run `lemonade server` at logon, bound to loopback only (the connection always
 # arrives via the SSH RemoteForward as 127.0.0.1, so no need to expose it).
+#
+# Launch it *detached and hidden* through a Start-Process wrapper rather than
+# invoking lemonade.exe directly: a console app run directly by Task Scheduler
+# is attached to a console and gets killed with STATUS_CONTROL_C_EXIT
+# (0xC000013A) when that console closes. The wrapper exits immediately, leaving
+# lemonade running windowless in the interactive session (required so it can pop
+# the browser). ExecutionTimeLimit 0 disables the 3-day auto-stop; restart-on-
+# failure revives it if it ever dies.
 $taskName = "lemonade-server"
-if (-not (Get-ScheduledTask -TaskName $taskName -ErrorAction SilentlyContinue)) {
-    $action  = New-ScheduledTaskAction -Execute $lemonadeExe -Argument "server --allow 127.0.0.1"
-    $trigger = New-ScheduledTaskTrigger -AtLogOn
-    $settings = New-ScheduledTaskSettingsSet -AllowStartIfOnBatteries -DontStopIfGoingOnBatteries
-    Register-ScheduledTask -TaskName $taskName -Action $action -Trigger $trigger -Settings $settings -RunLevel Limited -Force | Out-Null
-}
+$psArgs = "Start-Process -WindowStyle Hidden -FilePath '$lemonadeExe' -ArgumentList 'server','--allow','127.0.0.1'"
+$action  = New-ScheduledTaskAction -Execute "powershell.exe" `
+    -Argument "-NoProfile -WindowStyle Hidden -NonInteractive -Command `"$psArgs`""
+$trigger = New-ScheduledTaskTrigger -AtLogOn
+$settings = New-ScheduledTaskSettingsSet -AllowStartIfOnBatteries -DontStopIfGoingOnBatteries `
+    -ExecutionTimeLimit ([TimeSpan]::Zero) -RestartInterval (New-TimeSpan -Minutes 1) -RestartCount 3
+# -Force re-registers so re-running this script applies fixes to an existing task.
+Register-ScheduledTask -TaskName $taskName -Action $action -Trigger $trigger -Settings $settings -RunLevel Limited -Force | Out-Null
+
 # Start it now so it's up without needing to log out/in.
-if ((Get-ScheduledTask -TaskName $taskName).State -ne "Running") {
-    Start-ScheduledTask -TaskName $taskName
-}
+Start-ScheduledTask -TaskName $taskName
 
 # ── ssh RemoteForward (laptop = chain root) ──────────────────────────────────
 # The Linux hosts get this block via the stowed ssh/ package; the laptop isn't
