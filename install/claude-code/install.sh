@@ -7,6 +7,14 @@ source "$(dirname "$0")/../lib.sh"
 # the qgenie API endpoint, which only resolves on the corporate network; and the
 # built-in WebSearch tool is geo-gated to the US, so work hosts route search
 # through Tavily instead.
+#
+# Search routing has two halves:
+#   1. Tavily MCP registration — lives here. `~/.claude.json` is not stowable
+#      (per-project state, OAuth session, caches), so this script is the
+#      version-controlled recipe.
+#   2. `permissions.deny: ["WebSearch"]` — lives in the stowed
+#      claude/.claude/settings.json so Claude can't fall back to the broken
+#      built-in. Applied by install.sh's final stow step.
 
 case "${DOTFILES_ENV:-}" in
     work-argos|work-devcompute) ;;

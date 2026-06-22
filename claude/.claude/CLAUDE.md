@@ -1,0 +1,1 @@
+- Web search: use Tavily MCP (`mcp__tavily__*`); built-in WebSearch is denied.
