@@ -18,7 +18,7 @@ Personal dotfiles managed with GNU Stow. Top-level package directories (`nvim/`,
 REINSTALL=1 ./install.sh <name>  # force reinstall a tool that's already present
 ```
 
-The stow step always runs at the end and links `nvim zsh git tmux bin` into `$HOME` (plus `claude` on non-`home` envs). The `bin/` package holds standalone helper scripts that land on `$PATH` via `bin/.local/bin/` (e.g. `browser-open`, the `$BROWSER` wrapper — see below).
+The stow step always runs at the end and links `nvim zsh git tmux bin` into `$HOME` (plus `claude` on non-`home` envs). The `bin/` package holds standalone helper scripts that land on `$PATH` via `bin/.local/bin/` (e.g. `browser-open`, the `$BROWSER` wrapper, and `open-file`, which opens an NFS path in the laptop's Explorer — both route by env and share the lemonade tunnel; see below).
 
 ## DOTFILES_ENV
 

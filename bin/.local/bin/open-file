@@ -1,0 +1,128 @@
+#!/usr/bin/env bash
+# Open a file/folder in the Windows-side Explorer, from a headless Linux host.
+#
+# Two environments, mirroring browser-open's split:
+#
+#   WSL (home)  -> wslpath -w turns /mnt/c/... or \\wsl$\... into a Windows path,
+#                  then wslview / explorer.exe opens it. No tunnel, no NFS.
+#   work (SSH)  -> relay the path to the laptop's Explorer over the lemonade
+#                  ssh -R tunnel. lemonade's `open` on Windows is ShellExecute,
+#                  so a UNC path opens in Explorer — IF the laptop can reach the
+#                  same bytes as a \\share.
+#
+# The hard part on work hosts is path translation, which lemonade does NOT do:
+# its --trans-localfile only rewrites paths local to the laptop, not remote->UNC.
+# We derive the UNC from the live mount table instead of hardcoding filer names:
+#
+#   path -> ls -d (fire autofs) -> findmnt -T -> "10.49.242.206:/prj/.../scratch"
+#        -> reverse-DNS the IP   -> mudpie.qualcomm.com -> short "mudpie"
+#        -> strip export prefix  -> remainder
+#        -> \\mudpie\<SHARE>\<remainder, backslashed>  -> lemonade open
+#
+# What can't be auto-derived: the NFS export root is not guaranteed to equal the
+# SMB share name (NetApp serves both, but the CIFS share may be labelled
+# differently). We guess SHARE = last component of the export root, with a small
+# per-host override table below for the cases where SMB != NFS naming. Edit it
+# when a filer opens to the wrong \\host\share.
+#
+# Paths on local disk (e.g. /local/mnt/workspace on devcompute) have no server
+# in the mount table and no UNC anywhere — those just report the failure.
+set -euo pipefail
+
+# ── SMB share-name overrides (host:export-root -> share) ────────────────────
+# Only needed where the CIFS share name differs from the export's last segment.
+# Key is "<shorthost> <export-root>"; value is the share to use. Add as you hit
+# mismatches (confirm by pasting \\host\share into Explorer's address bar).
+declare -A SHARE_OVERRIDE=(
+    ["mudpie /prj/qct/mlsys/lasvegas/scratch"]="lasvegas_scratch"
+)
+
+die() { echo "open-file: $*" >&2; exit 1; }
+
+[[ $# -eq 1 ]] || die "usage: open-file <path>"
+raw="$1"
+
+# Absolutize so findmnt and prefix-stripping are unambiguous.
+if [[ "$raw" != /* ]]; then
+    raw="$(pwd)/$raw"
+fi
+# Normalize away ./, ../, //, and trailing slashes (which would otherwise leak
+# into the UNC as literal \.\ segments). -m: don't require existence; -s: don't
+# resolve symlinks (keep the path the user named, just tidied).
+raw="$(realpath -ms "$raw")"
+
+# ── WSL (home): translate to a Windows path and hand to Explorer ────────────
+# No tunnel, no NFS — wslpath does the translation lemonade can't, then the same
+# openers browser-open uses. explorer.exe returns nonzero even on success.
+if grep -qi microsoft /proc/version 2>/dev/null; then
+    [[ -e "$raw" ]] || die "no such path: $raw"
+    winpath="$(wslpath -w "$raw" 2>/dev/null)" || die "wslpath could not translate: $raw"
+    echo "open-file: $raw"
+    echo "        -> $winpath"
+    if command -v wslview >/dev/null 2>&1; then
+        exec wslview "$winpath"
+    elif command -v explorer.exe >/dev/null 2>&1; then
+        explorer.exe "$winpath" >/dev/null 2>&1 || true
+        exit 0
+    fi
+    die "neither wslview nor explorer.exe found"
+fi
+
+# Fire any autofs mount: findmnt returns nothing for a not-yet-triggered
+# automount, so touch the path (or its dirname if the leaf doesn't exist yet)
+# before querying. Best-effort — a stat failure just means findmnt comes back
+# empty and we report below.
+ls -d "$raw" >/dev/null 2>&1 || ls -d "$(dirname "$raw")" >/dev/null 2>&1 || true
+
+# Walk up to the containing network mount. Filter to nfs/cifs: an autofs trigger
+# is stacked at the same mountpoint as the NFS mount it spawns, and unfiltered
+# findmnt returns the autofs layer ("ldap:...:automountMap...") first. The
+# filter picks the real filer; take the last line in case of nested mounts.
+source_spec="$(findmnt -T "$raw" -t nfs,nfs4,cifs -no SOURCE 2>/dev/null | tail -1 || true)"
+
+# No network mount: either local disk or a path that doesn't exist. Distinguish
+# the two for a useful message — local disk has no UNC, so nothing we can do.
+if [[ -z "$source_spec" ]]; then
+    if findmnt -T "$raw" >/dev/null 2>&1; then
+        die "$raw is on local disk ($(findmnt -T "$raw" -no SOURCE 2>/dev/null)) — not reachable from the laptop.
+     Copy it to an NFS share (or scp it over) to open it there."
+    fi
+    die "no mount found for: $raw (does the path exist?)"
+fi
+
+server="${source_spec%%:*}"      # 10.49.242.206  (or a hostname)
+export_root="${source_spec#*:}"  # /prj/qct/mlsys/lasvegas/scratch
+
+# Resolve an IP to a short hostname; pass a hostname through untouched.
+host="$server"
+if [[ "$server" =~ ^[0-9.]+$ ]]; then
+    fqdn="$(getent hosts "$server" 2>/dev/null | awk '{print $2; exit}')"
+    [[ -n "$fqdn" ]] || die "no reverse-DNS for $server — can't name the \\\\host"
+    host="$fqdn"
+fi
+host="${host%%.*}"               # mudpie.qualcomm.com -> mudpie
+
+# Remainder of the path below the export root.
+remainder="${raw#"$export_root"}"
+remainder="${remainder#/}"       # drop a leading slash
+
+# Share name: override table wins, else the export root's last segment.
+share="${SHARE_OVERRIDE["$host $export_root"]:-${export_root##*/}}"
+
+# Build the UNC: \\host\share\remainder with backslashes.
+unc="\\\\${host}\\${share}"
+if [[ -n "$remainder" ]]; then
+    unc="${unc}\\${remainder//\//\\}"
+fi
+
+command -v lemonade >/dev/null 2>&1 || die "lemonade not found — is this a work host?"
+
+echo "open-file: $raw"
+echo "        -> $unc"
+if lemonade open "$unc" 2>/dev/null; then
+    exit 0
+fi
+die "lemonade open failed — is 'lemonade server' up on the laptop and the
+     RemoteForward 2489 tunnel connected? (see notes/improvements.md)
+     If the tab opened to the wrong place, the SMB share name likely differs
+     from the NFS export — add an entry to SHARE_OVERRIDE in this script."
