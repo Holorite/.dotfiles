@@ -111,10 +111,11 @@ should_install() {
 # Decide whether to install something rooted at a path.
 # Args: <name> <path>
 should_install_path() {
-    local name="$1" 
+    local name="$1"
     shift
-    paths=("$@")
+    local paths=("$@")
     local missing=1
+    local path
     for path in "${paths[@]}"; do
         if [[ -e "$path" ]]; then
             missing=0

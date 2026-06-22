@@ -37,8 +37,9 @@ fi
 if should_install eza eza --version; then
     info "Installing eza..."
     if ! try_brew eza; then
-        curl -sL "https://github.com/eza-community/eza/releases/latest/download/eza_x86_64-unknown-linux-gnu.tar.gz" \
-            | tar -xz -C "$BIN_DIR" || error "Failed to install eza"
+        ensure_eget
+        eget_install eza-community/eza --asset gnu --to "$BIN_DIR" \
+            || error "Failed to install eza"
     fi
     info "eza installed"
 fi
