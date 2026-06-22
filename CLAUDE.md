@@ -18,7 +18,7 @@ Personal dotfiles managed with GNU Stow. Top-level package directories (`nvim/`,
 REINSTALL=1 ./install.sh <name>  # force reinstall a tool that's already present
 ```
 
-The stow step always runs at the end and links `nvim zsh git tmux` into `$HOME`.
+The stow step always runs at the end and links `nvim zsh git tmux` into `$HOME` (plus `claude` on non-`home` envs).
 
 ## DOTFILES_ENV
 
@@ -30,6 +30,7 @@ First run prompts for an environment and writes the choice to `~/.dotfiles_env`.
 - `zsh/env/<env>.zsh` is sourced after `conf.d/*.zsh` for env-specific paths/aliases.
 - `git/.gitconfig.<env>` is symlinked to `~/.gitconfig.local` (included by `git/.gitconfig`).
 - `init.lua` configures `clangd` to run via `./run-in-docker` on the work envs, plain `clangd` on home.
+- `install/claude-code/install.sh` runs only on the work envs (it pulls Claude Code from Qualcomm's internal qgenie installer and registers the Tavily search MCP, both corp-network-only). It gates with an explicit `case "${DOTFILES_ENV:-}"` rather than a `.utils.sh` helper, since the condition (work-only) doesn't match `use_brew`'s home-only sense — follow this `case` pattern for other work-only installers.
 
 When adding env-conditional logic, follow these existing seams rather than introducing new env checks.
 
@@ -45,6 +46,8 @@ Every installer sources `install/lib.sh` and follows the same shape. Use the hel
 All installer scripts run with `set -euo pipefail`.
 
 New `install/<name>/install.sh` files must be `chmod +x` — the dispatcher in `install.sh` only picks up executable installers (silently skips otherwise).
+
+`install/claude-code/install.sh` shows two non-binary-install patterns worth reusing: (1) it registers a remote MCP server (`claude mcp add --scope user`) whose config lands in `~/.claude.json` — not a stowable file, so the installer *is* the version-controlled recipe; (2) the Tavily key is stored as the literal `${TAVILY_API_KEY}` (single-quoted so the shell doesn't expand it) for Claude to expand at runtime, keeping the secret out of `~/.claude.json` — it lives only in `~/.zsh_secrets`. MCP idempotency uses `claude mcp get <name>` (the binary may need `hash -r` first on a fresh install, since bash caches command lookups).
 
 ## Zsh layout
 
