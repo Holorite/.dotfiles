@@ -14,6 +14,7 @@ Personal dotfiles managed with GNU Stow. Top-level package directories (`nvim/`,
 ./install.sh <name>       # run one installer, then stow
 ./install.sh all          # run every installer, then stow
 ./install.sh all-confirm  # prompt Y/n per installer, then stow
+./install.sh missing      # run every installer non-interactively (REINSTALL=0), installing only what's absent
 REINSTALL=1 ./install.sh <name>  # force reinstall a tool that's already present
 ```
 
