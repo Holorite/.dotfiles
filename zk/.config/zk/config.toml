@@ -15,8 +15,8 @@ colon-tags = false
 # Notes live flat in projects/<slug>/; the note's kind (exploration|plan|task)
 # is a frontmatter tag, not a subdir. exploration/plan share kinded.md (a single
 # `kind` tag); task has its own template (status/created/priority frontmatter
-# for the `bullets-task` renderer); `note` is a vault-root kind for free-floating
-# notes — tagged `note` so it's discoverable via the same tag machinery.
+# for the `vault` CLI's render_tasks renderer); `note` is a vault-root kind for
+# free-floating notes — tagged `note` so it's discoverable via the same tag machinery.
 [group.exploration]
 paths = ["projects"]
 [group.exploration.note]
@@ -108,11 +108,10 @@ sync = 'vault sync "$*"'
 # as an alias so the format lives next to the other zk list-format aliases.
 bullets-oneline = 'zk list -q --format="- {{link}}" "$@"'
 bullets-short = 'zk list -q --format="- {{link}} — {{title}}{{#if snippets}}\n{{list snippets}}{{/if}}" "$@"'
-# Tasks render with a GFM checkbox driven by frontmatter `status` (todo/started/
-# done), the creation date, and an optional `priority` (p0..p3) shown inline.
-# The status glyph map is applied in sed because raymond has no equality helper;
-# emit a sentinel `__STATUS__<value>__` and rewrite it to the right checkbox.
-bullets-task = '''zk list -q --tag task --format="- __STATUS__{{metadata.status}}__ {{link}} — {{title}} ({{metadata.created}}{{#if metadata.priority}}, {{metadata.priority}}{{/if}})" "$@" | sed -e 's/__STATUS__todo__/[ ]/' -e 's/__STATUS__started__/[\/]/' -e 's/__STATUS__done__/[x]/' -e 's/__STATUS__[^_]*__/[?]/' '''
+# Task rendering (status glyph, done/total tracker, open sub-tasks, project
+# grouping at root) lives in the `vault` CLI's render_tasks — a bash loop over
+# `zk list`, since grouping and body-checkbox counting are beyond what one zk
+# --format line can express — so there's no task-bullet alias here.
 # Untagged catch-all: list notes whose tags are disjoint from $SECTIONED_TAGS
 # (comma-separated, set by vault). Composes a `--tag NOT a, NOT b, ...` filter
 # from the env so the renderer and the section list share one source of truth.

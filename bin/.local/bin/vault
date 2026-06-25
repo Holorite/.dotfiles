@@ -124,9 +124,10 @@ join_sections() {
 }
 
 # Ordered list of sectioned tags driving every MOC layout. Headings are the
-# pluralized capitalized tag; tasks use `bullets-task` (checkbox + date + opt
-# priority), everything else uses `bullets-short`. The same list is exported as
-# $SECTIONED_TAGS so the `zk bullets-untagged` alias's NOT-filter stays in sync.
+# pluralized capitalized tag; tasks use `render_tasks` (checkbox + date + opt
+# priority + sub-tasks/tracker), everything else uses `bullets-short`. The same
+# list is exported as $SECTIONED_TAGS so the `zk bullets-untagged` alias's
+# NOT-filter stays in sync.
 SECTIONS=(task note exploration plan)
 
 # Heading title for a sectioned tag — plain English pluralization, no inflection
@@ -142,13 +143,99 @@ section_heading() {
 }
 
 # Render the bullet list for a sectioned tag scoped to a path (relative to
-# vault). Task bullets are checkboxed; everything else is the short renderer.
+# vault). Tasks get the richer renderer (render_tasks: open sub-tasks, done/total
+# tracker, project grouping at root); every other tag is the short renderer.
+# Keeping this dispatch here lets content_for_scope's loop stay uniform.
 render_section() {
     local tag="$1" path="$2"
     case "$tag" in
-        task) zk bullets-task "$path" --sort title 2>/dev/null ;;
+        task) render_tasks "$path" ;;
         *)    zk bullets-short "$path" --tag "$tag" --sort title 2>/dev/null ;;
     esac
+}
+
+# Map a task note's frontmatter `status` to a GFM checkbox glyph
+# (todo/started/done → [ ]/[/]/[x]); an unknown status renders [?].
+task_glyph() {
+    case "$1" in
+        todo)    echo '[ ]' ;;
+        started) echo '[/]' ;;
+        done)    echo '[x]' ;;
+        *)       echo '[?]' ;;
+    esac
+}
+
+# Project slug for a task's absolute path: the first path segment under
+# <vault>/projects/.
+slug_of() {
+    local s="${1#"$VAULT"/projects/}"
+    echo "${s%%/*}"
+}
+
+# Render the `## Tasks` body for a scope. Each task is a parent bullet plus its
+# open sub-tasks (body checkboxes) and a done/total tracker.
+#
+#   $1 = scope path relative to vault ("." = root/whole-vault, "projects/<slug>")
+#
+# Root scope (path ".") differs in two ways: done parent tasks are hidden (the
+# top index is an actionable dashboard), and tasks are grouped under a
+# `### <slug>` heading carrying the project's done/total parent-task count. A
+# per-project MOC lists every task (incl. done) flat, since it's already scoped
+# to one project.
+#
+# Fields arrive NUL-delimited (so a record can't break on a stray newline) with
+# US between fields (so multi-word titles / priorities like "VERY HIGH"
+# survive). zk matches no notes for the path arg ".", so root scope passes NO
+# path filter (whole notebook) rather than ".".
+render_tasks() {
+    local path="$1"
+    local root=""; [[ "$path" == "." ]] && root="root"
+    local US=$'\x1f'
+    local -a scope=()
+    [[ "$path" != "." ]] && scope=("$path")
+
+    local out="" cur_slug=""
+    local status abspath link title created priority
+    while IFS="$US" read -r -d '' status abspath link title created priority; do
+        # Dashboard (root) hides completed parent tasks.
+        [[ "$root" == root && "$status" == "done" ]] && continue
+
+        # Root: open a `### <slug>` heading when the project changes (--sort path
+        # keeps a project contiguous). The tracker is the project's done/total
+        # parent tasks — two quick zk counts, incl. the done tasks hidden above.
+        if [[ "$root" == root ]]; then
+            local slug; slug="$(slug_of "$abspath")"
+            if [[ "$slug" != "$cur_slug" ]]; then
+                cur_slug="$slug"
+                local proj="projects/$slug" ptotal pdone
+                ptotal="$(zk list -q --tag task "$proj" --format . 2>/dev/null | grep -c . || true)"
+                pdone="$(zk list -q --tag task "$proj" --format '{{metadata.status}}' 2>/dev/null | grep -cx 'done' || true)"
+                [[ -n "$out" ]] && out+=$'\n'
+                out+="### [[projects/$slug/index|$slug]] ($pdone/$ptotal)"$'\n'
+            fi
+        fi
+
+        # Sub-task tracker: count the note's body checkbox lines (any indent);
+        # show "(done/total)" only when it has any.
+        local sub_total sub_done tracker=""
+        sub_total="$(grep -cE '^[[:space:]]*- \[[ xX/]\] ' "$abspath" 2>/dev/null || true)"
+        sub_done="$(grep -cE '^[[:space:]]*- \[[xX]\] ' "$abspath" 2>/dev/null || true)"
+        [[ "${sub_total:-0}" -gt 0 ]] && tracker=" ($sub_done/$sub_total)"
+
+        local meta="$created"
+        [[ -n "$priority" ]] && meta+=", $priority"
+        out+="- $(task_glyph "$status") $link — $title ($meta)$tracker"$'\n'
+
+        # The note's OPEN sub-tasks ([ ]/[/]), re-indented two spaces under the
+        # parent so original nesting is preserved (done ones are in the tracker).
+        local subs
+        subs="$(grep -E '^[[:space:]]*- \[[ /]\] ' "$abspath" 2>/dev/null | sed 's/^/  /' || true)"
+        [[ -n "$subs" ]] && out+="$subs"$'\n'
+    done < <(zk list -q --tag task "${scope[@]}" --sort path \
+        --format "{{metadata.status}}${US}{{abs-path}}${US}{{link}}${US}{{title}}${US}{{metadata.created}}${US}{{metadata.priority}}" \
+        --delimiter0 2>/dev/null)
+
+    printf '%s' "${out%$'\n'}"
 }
 
 # Build the full `<!-- auto:content -->` body for a path scope (`.` = vault
