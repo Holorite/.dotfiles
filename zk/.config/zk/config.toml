@@ -1,0 +1,122 @@
+[note]
+filename = "{{slug title}}"
+extension = "md"
+template = "default.md"
+id-charset = "alphanum"
+id-length = 6
+exclude = [".obsidian"]
+
+[format.markdown]
+link-format = "wiki"
+link-drop-extension = true
+hashtags = false
+colon-tags = false
+
+# Notes live flat in projects/<slug>/; the note's kind (exploration|plan|task)
+# is a frontmatter tag, not a subdir. exploration/plan share kinded.md (a single
+# `kind` tag); task has its own template (status/created/priority frontmatter
+# for the `bullets-task` renderer); `note` is a vault-root kind for free-floating
+# notes — tagged `note` so it's discoverable via the same tag machinery.
+[group.exploration]
+paths = ["projects"]
+[group.exploration.note]
+filename = "{{slug title}}"
+template = "kinded.md"
+
+[group.plan]
+paths = ["projects"]
+[group.plan.note]
+filename = "{{slug title}}"
+template = "kinded.md"
+
+[group.task]
+paths = ["projects"]
+[group.task.note]
+filename = "{{slug title}}"
+template = "task.md"
+
+[group.note]
+paths = ["."]
+[group.note.note]
+filename = "{{slug title}}"
+template = "note.md"
+
+[lsp.diagnostics]
+wiki-title = "hint"
+dead-link = "error"
+
+[lsp.completion]
+note-label = "{{title-or-path}}"
+note-filter-text = "{{title}} {{path}}"
+note-detail = "{{path}}"
+
+[tool]
+editor = "nvim"
+fzf-preview = "bat -p --color always {-1}"
+
+# Cross-project views by kind (the flat layout's answer to the old per-type
+# directories): `zk list explorations`, ...
+[filter]
+explorations = "--tag exploration --sort modified"
+plans = "--tag plan --sort modified"
+tasks = "--tag task --sort modified"
+
+[alias]
+paths = "zk list --format \"'{{path}}'\" --quiet --delimiter ' ' $@"
+# zk chdir's to the notebook before running an alias and exports ZK_NOTEBOOK_DIR
+# into it; ZK_CWD (stamped by the zk() shell wrapper in zsh/conf.d/vault.zsh)
+# carries the real invocation dir so slug-aware aliases resolve the project you
+# ran them from, not the vault. These four verbs used to be `vault` subcommands;
+# they're zk wrappers, so they live here. The `vault` CLI keeps only what zk has
+# no equivalent for (slug/reindex/sync/delete).
+slug = 'vault slug "$ZK_CWD"'
+# Records are emitted NUL-delimited then flattened (newlines→spaces, NUL→newline)
+# so a multi-line lead can't corrupt the one-record-per-line `path<TAB>title<TAB>lead`
+# stream the slash commands parse.
+find = '''zk list --quiet --match "$*" --format "{{abs-path}}\t{{title}}\t{{lead}}" --delimiter0 | tr '\n' ' ' | tr '\0' '\n' '''
+# related = union of zk's --related (shared link-neighbors) and unlinked mentions,
+# each row labeled in column 1; MOC index.md rows dropped (every note links its MOC).
+related = '''note="$1"; { zk list --quiet --related "$note" --format "related\t{{abs-path}}\t{{title}}\t{{lead}}" --delimiter0; zk list --quiet --mention "$note" --no-link-to "$note" --format "mention\t{{abs-path}}\t{{title}}\t{{lead}}" --delimiter0; } | tr '\n' ' ' | tr '\0' '\n' | awk -F'\t' 'NF && $2 !~ /\/index\.md$/' '''
+# moc = idempotent project-MOC ensure; prints projects/<slug>/index.md either
+# way. The seed is two lines (title + auto markers), inlined here so there's no
+# `project` group/template — `vault reindex` fills the content block.
+# Per-kind note creation: `zk exploration "Title"`, `zk plan "Title"`, `zk task
+# "Title"`. Shared logic in _new (kind=$1): derive the slug from the caller dir,
+# `mkdir -p projects/<slug>` so `zk new` has a target dir (the MOC itself is
+# auto-seeded by `vault reindex`/`vault sync` from the directory's existence), and
+# create a flat note whose --extra feeds the template's `tags:[<kind>]`. By
+# default zk opens the note in the editor ([tool] editor = nvim) — the human
+# flow. Non-interactive callers (the vault-explorer agent, any scripted/API use)
+# export ZK_NO_EDIT=1, which swaps the editor for --print-path so they get the
+# path on stdout and nothing blocks on a tty.
+_new = '''kind="$1"; shift; slug="$(vault slug "$ZK_CWD")"; dir="$ZK_NOTEBOOK_DIR/projects/$slug"; mkdir -p "$dir"; flag=""; [ -n "${ZK_NO_EDIT:-}" ] && flag="--print-path"; zk new --no-input $flag -g "$kind" "$dir" --title "$*" --extra "kind=$kind"'''
+exploration = 'zk _new exploration "$@"'
+plan = 'zk _new plan "$@"'
+task = 'zk _new task "$@"'
+# Free-floating notes at the vault root. No slug, no project MOC; just a tagged
+# note in `.` so the same tag machinery surfaces it under `## Notes`. Same
+# editor-vs-print-path rule as _new (ZK_NO_EDIT).
+note = '''flag=""; [ -n "${ZK_NO_EDIT:-}" ] && flag="--print-path"; zk new --no-input $flag -g note "$ZK_NOTEBOOK_DIR" --title "$*"'''
+# sync = reindex every MOC + git add/commit/push, all in one commit. Delegates to
+# the `vault` CLI (git-orchestration, not note logic) so there's one source of
+# truth — and unlike a bare `git commit`, the reindex means navigation never
+# drifts from the notes on disk.
+sync = 'vault sync "$*"'
+# Render `zk list` matches as MOC entries: `- <wikilink> — <title>` per row, plus
+# a `> <lead>` block-quote line when the note has a lead paragraph. Used by
+# `vault reindex` to fill each MOC's `<!-- auto:content -->` region, but exposed
+# as an alias so the format lives next to the other zk list-format aliases.
+bullets-oneline = 'zk list -q --format="- {{link}}" "$@"'
+bullets-short = 'zk list -q --format="- {{link}} — {{title}}{{#if snippets}}\n{{list snippets}}{{/if}}" "$@"'
+# Tasks render with a GFM checkbox driven by frontmatter `status` (todo/started/
+# done), the creation date, and an optional `priority` (p0..p3) shown inline.
+# The status glyph map is applied in sed because raymond has no equality helper;
+# emit a sentinel `__STATUS__<value>__` and rewrite it to the right checkbox.
+bullets-task = '''zk list -q --tag task --format="- __STATUS__{{metadata.status}}__ {{link}} — {{title}} ({{metadata.created}}{{#if metadata.priority}}, {{metadata.priority}}{{/if}})" "$@" | sed -e 's/__STATUS__todo__/[ ]/' -e 's/__STATUS__started__/[\/]/' -e 's/__STATUS__done__/[x]/' -e 's/__STATUS__[^_]*__/[?]/' '''
+# Untagged catch-all: list notes whose tags are disjoint from $SECTIONED_TAGS
+# (comma-separated, set by vault). Composes a `--tag NOT a, NOT b, ...` filter
+# from the env so the renderer and the section list share one source of truth.
+# Callers narrow path scope via positional args and pass any extra `--exclude`s
+# (the top index excludes `projects` to skip project MOCs; a per-project caller
+# excludes its own `index.md` so the MOC doesn't self-list).
+bullets-untagged = '''nots=$(printf %s "${SECTIONED_TAGS:-task,note,exploration,plan}" | sed 's/,/, NOT /g; s/^/NOT /'); zk list -q --tag "$nots" --format="- {{link}} — {{title}}{{#if snippets}}\n{{list snippets}}{{/if}}" --exclude index.md "$@"'''

@@ -3,7 +3,8 @@ set -euo pipefail
 source "$(dirname "$0")/../lib.sh"
 
 # work-vault: a git-synced Obsidian vault that doubles as Claude's structured
-# working-context store (explorations/plans/tasks wikilinked into a graph) and a
+# working-context store (explorations/plans/tasks wikilinked into a graph, kind
+# carried as a frontmatter tag) and a
 # home for regular notes. Lives under workspace_dir (work_vault_dir) — the
 # big-disk volume, so it stays off the small home partition on work hosts; on the
 # laptop / home env workspace_dir is $HOME, so it lands at $HOME/work-vault. The
@@ -76,31 +77,22 @@ fi
 # layout. Only seed when index.md is absent.
 if [[ ! -f "$VAULT/index.md" ]]; then
     info "work-vault: seeding skeleton"
-    mkdir -p "$VAULT/projects" "$VAULT/explorations" "$VAULT/plans" \
-             "$VAULT/tasks" "$VAULT/.obsidian"
+    mkdir -p "$VAULT/projects" "$VAULT/.obsidian"
 
     cat > "$VAULT/index.md" <<'EOF'
----
-type: index
----
-# Work Vault
+# MOC: Work Vault
 
-Top-level map of content. Each project below links to its own MOC, which in turn
-links its explorations, plans, and tasks.
+Top-level map of content. Each project below links to its own MOC
+(`projects/<slug>/index.md`), which in turn links its explorations, plans, and
+tasks. Freeform personal notes live at the vault root and wikilink into the same
+graph.
 
-Machine-generated notes (Claude) live under `projects/`, `explorations/`,
-`plans/`, `tasks/`. Freeform personal notes can live anywhere else in the vault
-and wikilink into the same graph.
-
-## Projects
-<!-- auto:projects -->
-<!-- /auto:projects -->
+<!-- auto:content -->
+<!-- /auto:content -->
 EOF
 
-    # Keep otherwise-empty type folders in git so the layout clones intact.
-    for d in projects explorations plans tasks; do
-        : > "$VAULT/$d/.gitkeep"
-    done
+    # Keep otherwise-empty project folder in git so the layout clones intact.
+    : > "$VAULT/projects/.gitkeep"
 
     # Minimal Obsidian config: enable the graph view, ignore workspace churn.
     cat > "$VAULT/.obsidian/.gitignore" <<'EOF'
@@ -109,8 +101,15 @@ workspace-mobile.json
 cache/
 EOF
 
+    # zk config + templates are NOT seeded here — they live in the dotfiles `zk`
+    # stow package (→ ~/.config/zk/), inherited globally by zk. The vault keeps
+    # only an empty `.zk/` marker dir (created below) so zk recognizes it as a
+    # notebook; everything else (config.toml, templates/) resolves from the
+    # global config. See the work-vault section in CLAUDE.md.
+
     cat > "$VAULT/.gitignore" <<'EOF'
 .DS_Store
+.zk/notebook.db
 EOF
 
     git -C "$VAULT" add -A
@@ -120,3 +119,24 @@ EOF
 fi
 
 info "work-vault ready at $VAULT"
+
+# zk recognizes a directory as a notebook only if it contains a `.zk/` dir. The
+# config + templates live in ~/.config/zk (the dotfiles `zk` stow package), so
+# the vault needs only this empty marker. It holds just the gitignored
+# notebook.db, so it's never committed and is recreated per-host here.
+mkdir -p "$VAULT/.zk"
+
+# ── Install zk (binary + LSP) if missing ─────────────────────────────────────
+if should_install zk zk --version; then
+    info "Installing zk..."
+    if ! try_brew zk; then
+        ensure_eget
+        eget_install zk-org/zk --to "$BIN_DIR"
+    fi
+    info "zk installed"
+fi
+
+# Rebuild zk index (notebook.db is gitignored, regenerated per-host).
+if command -v zk &>/dev/null && [[ -d "$VAULT/.zk" ]]; then
+    zk index --no-input --notebook-dir "$VAULT" 2>/dev/null || true
+fi

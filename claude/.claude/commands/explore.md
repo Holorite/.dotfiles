@@ -28,11 +28,11 @@ yourself and confirm with the user before dispatching.
 
 3. **Collect results.** Each agent returns a short summary + vault path. Present
    ALL summaries to the user in a consolidated list (one section per subtopic:
-   heading, the summary lines, and the vault path for `/vault-load`).
+   heading, the summary lines, and the vault path).
 
 4. **Do NOT implement.** Your job is done after presenting the summaries. Tell
    the user they can:
-   - `/vault-load <topic>` to rehydrate any note into conversation
+   - read any note back via its vault path (or `zk find`) to rehydrate it
    - `/act` to pick findings to implement
    - `/improve <topic>` to run explore + act as a single flow
 
@@ -42,4 +42,5 @@ When constructing the vault-explorer agent prompt, include:
 - What to explore and why
 - Which files/areas to start from (if you know)
 - The project slug: `The project slug for the vault is "<slug>".`
-- The output expectation: write to `explorations/<slug>--<topic>.md`
+- The output expectation: write to `projects/<slug>/<topic>.md` (the agent's
+  `zk exploration` handles this, tagging the note `exploration`)
