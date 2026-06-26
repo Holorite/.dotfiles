@@ -1,9 +1,6 @@
 # dotfiles
 
 Personal dotfiles managed with [GNU Stow](https://www.gnu.org/software/stow/).
-Top-level package directories (`nvim/`, `zsh/`, `git/`, `tmux/`) mirror the
-`$HOME` layout and are symlinked into place by `stow`. `install/` holds
-per-tool bootstrap scripts.
 
 ## Fresh-clone bootstrap
 
@@ -14,9 +11,8 @@ cd ~/.dotfiles
 exec zsh                # start a new shell
 ```
 
-On first run you'll be prompted to pick a `DOTFILES_ENV` (see below); the
-choice is saved to `~/.dotfiles_env`. `stow` is bootstrapped automatically if
-it isn't already on `PATH`.
+`DOTFILES_ENV` separates worskpace specific settings; saved to `~/.dotfiles_env`.
+`stow` is bootstrapped automatically if it isn't already on `PATH`.
 
 ## Usage
 

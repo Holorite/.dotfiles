@@ -96,7 +96,7 @@ if ! command -v stow &>/dev/null; then
 fi
 
 # ── stow ───────────────────────────────────────────────────────────────────────
-stow -d "$SCRIPT_DIR" -t "$HOME" nvim zsh git tmux bin zk
+stow -d "$SCRIPT_DIR" -t "$HOME" nvim zsh git tmux bin zk starship
 if [[ "$DOTFILES_ENV" != "home" ]]; then
     # Back up hand-edited files that stow will replace with symlinks.
     for f in ~/.ssh/config ~/.claude/CLAUDE.md; do

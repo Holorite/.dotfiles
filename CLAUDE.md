@@ -18,7 +18,7 @@ Personal dotfiles managed with GNU Stow. Top-level package directories (`nvim/`,
 REINSTALL=1 ./install.sh <name>  # force reinstall a tool that's already present
 ```
 
-The stow step always runs at the end and links `nvim zsh git tmux bin zk` into `$HOME` (plus `claude` on non-`home` envs). The `bin/` package holds standalone helper scripts that land on `$PATH` via `bin/.local/bin/` (e.g. `browser-open`, the `$BROWSER` wrapper, and `open-file`, which opens an NFS path in the laptop's Explorer — both route by env and share the lemonade tunnel; see below). The `zk/` package holds the global zk config (`zk/.config/zk/` → `~/.config/zk/`); see the **work-vault** section.
+The stow step always runs at the end and links `nvim zsh git tmux bin zk starship` into `$HOME` (plus `claude` on non-`home` envs). The `bin/` package holds standalone helper scripts that land on `$PATH` via `bin/.local/bin/` (e.g. `browser-open`, the `$BROWSER` wrapper, and `open-file`, which opens an NFS path in the laptop's Explorer — both route by env and share the lemonade tunnel; see below). The `zk/` package holds the global zk config (`zk/.config/zk/` → `~/.config/zk/`); see the **work-vault** section. The `starship/` package holds the prompt config (`starship/.config/starship.toml` → `~/.config/starship.toml`); it's intentionally minimal — relies on starship's built-in default prompt, just setting `command_timeout` to keep `git status` from hanging on large repos. starship itself is installed by `install/zsh/install.sh`.
 
 ## DOTFILES_ENV
 
