@@ -61,8 +61,10 @@ See [`CLAUDE.md`](CLAUDE.md) for the detailed rules: installer shape
 env seams, and what is intentionally not stow-ed.
 
 Shell scripts are linted with `shellcheck` (`./install.sh shellcheck` to get
-the binary):
+the binary). `./install.sh` installs a tracked `githooks/pre-commit` hook (via
+`core.hooksPath`) that runs this on every commit — set `SKIP_SHELLCHECK=1` to
+bypass:
 
 ```sh
-shellcheck -e SC1091 install.sh install/lib.sh install/*/install.sh .utils.sh
+shellcheck -S warning -e SC1091 install.sh install/lib.sh install/*/install.sh .utils.sh
 ```

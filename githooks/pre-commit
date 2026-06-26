@@ -1,0 +1,30 @@
+#!/usr/bin/env bash
+#
+# Lint shell scripts with shellcheck before each commit.
+# Wired up by install.sh via `git config core.hooksPath githooks`.
+# Matches the canonical command documented in README.md.
+#
+# Skips silently if shellcheck isn't installed (./install.sh shellcheck to get it)
+# so a fresh clone mid-bootstrap isn't blocked. Set SKIP_SHELLCHECK=1 to bypass.
+
+set -euo pipefail
+
+if [[ -n "${SKIP_SHELLCHECK:-}" ]]; then
+    exit 0
+fi
+
+if ! command -v shellcheck &>/dev/null; then
+    echo "pre-commit: shellcheck not found — skipping lint (./install.sh shellcheck)" >&2
+    exit 0
+fi
+
+repo_root="$(git rev-parse --show-toplevel)"
+cd "$repo_root"
+
+# Canonical shell surface (kept in sync with README.md).
+# --severity=warning: block real warnings/errors, ignore advisory info notes.
+# shellcheck disable=SC2046  # word-splitting the glob is intended
+if ! shellcheck -S warning -e SC1091 install.sh install/lib.sh install/*/install.sh .utils.sh; then
+    echo "pre-commit: shellcheck failed — fix the above or commit with SKIP_SHELLCHECK=1" >&2
+    exit 1
+fi

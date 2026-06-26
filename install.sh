@@ -116,3 +116,7 @@ fi
 
 # Personal email for the dotfiles repo itself
 git -C "$SCRIPT_DIR" config user.email julian.r8y@gmail.com
+
+# Tracked git hooks (pre-commit shellcheck lint) for this repo
+git -C "$SCRIPT_DIR" config core.hooksPath githooks
+
