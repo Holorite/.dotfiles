@@ -2,12 +2,12 @@
 # vault — thin CLI over the git-synced work-vault (zk notebook).
 #
 # Holds only what zk has no native equivalent for: project-slug derivation, the
-# `<!-- auto:content -->` MOC reindexing, git-sync, and note deletion. The
-# note-creation / search / relation / MOC-ensure verbs that used to live here are
-# now zk aliases (`zk new-note`, `zk find`, `zk related`, `zk moc`) in
-# .zk/config.toml — the Claude slash commands and the vault-explorer agent call
-# those directly. This CLI stays declarative for the rest: it owns the vault
-# path, the slug, and the git-sync incantation.
+# `<!-- auto:content -->` MOC reindexing, git-sync, and the `find` body-resolver.
+# The note-creation / search / relation / MOC-ensure verbs that used to live here
+# are now zk aliases (`zk exploration|plan|task`, `zk find`, `zk related`, `zk
+# moc`) in .zk/config.toml — the Claude slash commands and the vault-explorer
+# agent call those directly. This CLI stays declarative for the rest: it owns the
+# vault path, the slug, and the git-sync incantation.
 #
 # Layout (flat project dirs, indexed by zk):
 #
@@ -33,6 +33,14 @@ VAULT="$WORK_VAULT_DIR"
 # (cfgs_for_cost_model -> cfgs-for-cost-model).
 slugify() {
     tr '[:upper:]' '[:lower:]' | sed -E 's/[^a-z0-9]+/-/g; s/^-+//; s/-+$//'
+}
+
+# Normalize a string for substring matching in `find`: lowercase, collapse every
+# non-alnum run to a single space, trim edges. Unlike slugify (dash-joined, for
+# filesystem slugs) this is space-joined so a query is a clean substring of a
+# title — `zk mcp`, `zk-mcp`, and `ZK MCP` all normalize to `zk mcp`.
+norm_match() {
+    tr '[:upper:]' '[:lower:]' | sed -E 's/[^a-z0-9]+/ /g; s/^ +//; s/ +$//'
 }
 
 # Branch names that name the repo, not the work: on these we slug by the git
@@ -319,17 +327,74 @@ cmd_sync() {
     fi
 }
 
+# Emit `path\ttitle` lines for notes whose title or basename contains the
+# normalized query (see norm_match), most-recent first, MOC `index.md` rows
+# dropped. The matcher behind `find`.
+match_notes() {
+    local q; q="$(printf '%s' "$1" | norm_match)"
+    local path title base hay
+    while IFS=$'\t' read -r path title; do
+        [[ -n "$path" ]] || continue
+        [[ "$path" == */index.md ]] && continue
+        base="${path##*/}"
+        hay="$(printf '%s %s' "$title" "$base" | norm_match)"
+        [[ "$hay" == *"$q"* ]] && printf '%s\t%s\n' "$path" "$title"
+    done < <(zk list --quiet --format "{{abs-path}}"$'\t'"{{title}}" --sort modified 2>/dev/null)
+}
+
+# Locate a note by TITLE or FILENAME — the `@`-mention resolver for agents.
+# Deliberately NOT a full-text body search (zk's --match): bodies match far too
+# much, so a common word would bury the note you meant. Matching is delegated to
+# match_notes (normalized title+basename substring, MOC rows dropped). Behavior
+# keys off the match count so the caller rarely has to branch:
+#   0 matches  -> message on stderr, exit 1
+#   1 match    -> print the note's full body to stdout, prefixed with a
+#                 `# <abs-path>` header line, so the caller reads it inline with
+#                 no extra Read round-trip (the whole point)
+#   >1 matches -> print one `<abs-path>\t<title>` line per match (most-recent
+#                 first) so the caller picks
+# `--paths-only`/`-p` forces the path<TAB>title list even for a single match
+# (lets scripted callers keep a uniform "0/1/>1 lines" branch).
+cmd_find() {
+    local paths_only=""
+    [[ "${1:-}" == -p || "${1:-}" == --paths-only ]] && { paths_only=1; shift; }
+    local query="$*"
+    [[ -n "$query" ]] || die "find: need a query"
+
+    local -a hits=()
+    while IFS= read -r line; do
+        [[ -n "$line" ]] && hits+=("$line")
+    done < <(match_notes "$query")
+
+    case "${#hits[@]}" in
+        0) die "find: no title/filename match for \"$query\"" ;;
+        1)
+            if [[ -n "$paths_only" ]]; then
+                printf '%s\n' "${hits[0]}"
+            else
+                printf '# %s\n\n' "${hits[0]%%$'\t'*}"
+                cat "${hits[0]%%$'\t'*}"
+            fi
+            ;;
+        *) printf '%s\n' "${hits[@]}" ;;
+    esac
+}
+
 usage() {
     cat >&2 <<'EOF'
 usage: vault <command> [args]
   dir                         print the vault directory (errors if absent)
   slug [dir]                  derive the project slug from a directory (default: cwd)
+  find [-p] <query>           locate a note by title/filename: 1 match prints its
+                              body (-p: path list), >1 prints path<TAB>title lines,
+                              0 exits 1 (MOC index.md rows excluded)
   reindex                     regenerate all MOC + index link lists from the filesystem
   sync "<msg>"                reindex, then git add -A && commit && push (best-effort)
 
 note creation / search / relations / MOC-ensure are zk aliases, not vault
-subcommands: `zk new-note <kind> <title>`, `zk find <query>`,
-`zk related <path>`, `zk moc <slug>` (see .zk/config.toml).
+subcommands: `zk exploration|plan|task <title>`, `zk find <query>`,
+`zk related <path>`, `zk moc <slug>` (see .zk/config.toml). `vault find` differs
+from `zk find`: it prints the body on a single match for inline reading.
 EOF
     exit 2
 }
@@ -337,6 +402,7 @@ EOF
 case "${1:-}" in
     dir)     shift; cmd_dir "$@" ;;
     slug)    shift; cmd_slug "$@" ;;
+    find)    shift; cmd_find "$@" ;;
     reindex) shift; cmd_reindex "$@" ;;
     sync)    shift; cmd_sync "$@" ;;
     ""|-h|--help) usage ;;

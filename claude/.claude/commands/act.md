@@ -18,9 +18,10 @@ user which to act on).
 1. **Load the source material.**
    - `vault="$(vault dir)"` — stop if the vault isn't present.
    - `slug="$(vault slug)"` — current project.
-   - If `$ARGUMENTS` is given, find the matching note(s) with `zk find
-     "$ARGUMENTS"` — it prints one `path<TAB>title<TAB>lead` line per full-text
-     match (0 lines = none; 1 = use it; >1 = ask the user which one(s)).
+   - If `$ARGUMENTS` is given, find the matching note(s) with
+     `vault find "$ARGUMENTS"`: a single match prints the note body directly (read
+     it inline — no extra Read needed), multiple matches print one
+     `path<TAB>title` line each (ask the user which), and no match exits non-zero.
    - If `$ARGUMENTS` is empty, list recent explorations/plans for `$slug`
      (`zk list projects/$slug --tag "exploration OR plan" --sort modified`) and
      ask the user to pick.

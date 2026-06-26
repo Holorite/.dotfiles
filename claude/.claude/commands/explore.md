@@ -32,7 +32,8 @@ yourself and confirm with the user before dispatching.
 
 4. **Do NOT implement.** Your job is done after presenting the summaries. Tell
    the user they can:
-   - read any note back via its vault path (or `zk find`) to rehydrate it
+   - read any note back via its vault path (or `vault find <query>` — a single
+     match prints the body inline) to rehydrate it
    - `/act` to pick findings to implement
    - `/improve <topic>` to run explore + act as a single flow
 

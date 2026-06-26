@@ -88,15 +88,22 @@ related = '''note="$1"; { zk list --quiet --related "$note" --format "related\t{
 # default zk opens the note in the editor ([tool] editor = nvim) — the human
 # flow. Non-interactive callers (the vault-explorer agent, any scripted/API use)
 # export ZK_NO_EDIT=1, which swaps the editor for --print-path so they get the
-# path on stdout and nothing blocks on a tty.
-_new = '''kind="$1"; shift; slug="$(vault slug "$ZK_CWD")"; dir="$ZK_NOTEBOOK_DIR/projects/$slug"; mkdir -p "$dir"; flag=""; [ -n "${ZK_NO_EDIT:-}" ] && flag="--print-path"; zk new --no-input $flag -g "$kind" "$dir" --title "$*" --extra "kind=$kind"'''
+# path on stdout and nothing blocks on a tty. A body piped on stdin is captured
+# via `zk new -i` (template `{{content}}`) — added only when stdin is not a tty,
+# so the interactive human flow (no pipe) is untouched; this is the one-shot
+# create-and-write path: `printf 'body' | zk plan "Title"`. The two flags are
+# kept in SEPARATE single-token vars (not one combined string): zk runs aliases
+# under $SHELL=zsh, which doesn't word-split unquoted vars, so a combined
+# "--print-path -i" would reach zk as one bogus argument.
+_new = '''kind="$1"; shift; slug="$(vault slug "$ZK_CWD")"; dir="$ZK_NOTEBOOK_DIR/projects/$slug"; mkdir -p "$dir"; pflag=""; [ -n "${ZK_NO_EDIT:-}" ] && pflag="--print-path"; iflag=""; [ -t 0 ] || iflag="-i"; zk new --no-input $pflag $iflag -g "$kind" "$dir" --title "$*" --extra "kind=$kind"'''
 exploration = 'zk _new exploration "$@"'
 plan = 'zk _new plan "$@"'
 task = 'zk _new task "$@"'
 # Free-floating notes at the vault root. No slug, no project MOC; just a tagged
 # note in `.` so the same tag machinery surfaces it under `## Notes`. Same
-# editor-vs-print-path rule as _new (ZK_NO_EDIT).
-note = '''flag=""; [ -n "${ZK_NO_EDIT:-}" ] && flag="--print-path"; zk new --no-input $flag -g note "$ZK_NOTEBOOK_DIR" --title "$*"'''
+# editor-vs-print-path rule as _new (ZK_NO_EDIT), and the same stdin-body capture
+# (-i when stdin is piped); same separate-var reason as _new.
+note = '''pflag=""; [ -n "${ZK_NO_EDIT:-}" ] && pflag="--print-path"; iflag=""; [ -t 0 ] || iflag="-i"; zk new --no-input $pflag $iflag -g note "$ZK_NOTEBOOK_DIR" --title "$*"'''
 # sync = reindex every MOC + git add/commit/push, all in one commit. Delegates to
 # the `vault` CLI (git-orchestration, not note logic) so there's one source of
 # truth — and unlike a bare `git commit`, the reindex means navigation never

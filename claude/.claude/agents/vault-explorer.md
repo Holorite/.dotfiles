@@ -33,22 +33,34 @@ and a short summary from you.
    is free.
 
 2. **Resolve vault coordinates** by running the helpers (on PATH):
-   - `slug="$(vault slug)"` — the project slug for the current repo.
-   - `zk moc "$slug"` — ensures the project MOC exists (idempotent).
-   - `vault="$(vault dir)"` — the vault root.
-   If `vault dir` errors (vault not installed on this host), STOP and
-   return a notice saying the vault is unavailable plus your summary inline —
-   do not fabricate a path.
+   - `vault dir` — the vault root. If it errors (vault not installed on this
+     host), STOP and return a notice saying the vault is unavailable plus your
+     summary inline — do not fabricate a path.
 
-3. **Write your findings** to `$vault/projects/$slug/<topic>.md` where
-   `<topic>` is a short kebab-case slug for the subtopic. Use this structure:
+   You do NOT need to derive the slug or build the path yourself: note creation
+   keys off your current working directory (run it from the repo you're
+   exploring, like a human would), and the project MOC is auto-seeded by
+   `vault sync`. (If you want the slug for the `Up:` wikilink in the body, run
+   `vault slug` — but the note files correctly without it.)
+
+3. **Write your findings in one shot** — pipe the note body straight into the
+   creation alias. `ZK_NO_EDIT=1` swaps the editor for path-printing (so nothing
+   blocks on a tty), and a body piped on stdin is captured into the note via the
+   template's `{{content}}`:
+
+   ```sh
+   printf '%s\n' "$BODY" | ZK_NO_EDIT=1 zk exploration "<topic title>"
+   ```
+
+   Run this **from the working directory of the repo you're exploring** — the
+   slug is derived from that cwd, so the note lands in
+   `projects/<slug>/<topic>.md` automatically. The alias prints the created path.
+
+   Structure the body you pipe in like this (the frontmatter `tags:` and the
+   `# <title>` heading are added by the template — your `$BODY` is everything
+   after the title):
 
    ```markdown
-   ---
-   tags: [exploration]
-   ---
-   # <topic title>
-
    <One-line gist — zk indexes the first paragraph as the "lead", which the
    reindexer uses as the MOC bullet text. Write it well.>
 
@@ -63,14 +75,6 @@ and a short summary from you.
    ## Open questions / next steps
    <anything unresolved>
    ```
-
-   Prefer creating the note with `ZK_NO_EDIT=1 zk exploration "<topic title>"`
-   — it scaffolds the `tags: [exploration]` frontmatter, the title, and the
-   `Up:` link via zk, then prints the path. `ZK_NO_EDIT=1` is required: without
-   it `zk exploration` opens nvim (the human flow) and would hang with no tty.
-   Write the body into the printed file. Otherwise, write the file directly to
-   `$vault/projects/$slug/<topic>.md` (include the `tags: [exploration]`
-   frontmatter yourself).
 
    Reference code as `file_path:line` so links are clickable. Link to sibling
    explorations with `[[projects/<slug>/<other-topic>]]` when relevant — you are
