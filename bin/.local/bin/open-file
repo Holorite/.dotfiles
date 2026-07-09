@@ -30,7 +30,13 @@
 set -euo pipefail
 
 # ── SMB share-name overrides (host:export-root -> share) ────────────────────
-# Only needed where the CIFS share name differs from the export's last segment.
+# Only needed where the CIFS share name differs from the export's last segment
+# (the auto-guess below). This mapping can't be derived automatically: the filer
+# won't reveal each share's server-side path to non-admins (NetShareGetInfo
+# level 2/502 -> WERR_ACCESS_DENIED, even with a Kerberos ticket), and LDAP's
+# automount maps carry the NFS export but no SMB share name. To find the value:
+#   smbclient -L <host> -N                 # list all shares, no creds needed
+#   smbclient //<host>/<share> -N -c ls     # confirm it's the same content
 # Key is "<shorthost> <export-root>"; value is the share to use. Add as you hit
 # mismatches (confirm by pasting \\host\share into Explorer's address bar).
 declare -A SHARE_OVERRIDE=(
