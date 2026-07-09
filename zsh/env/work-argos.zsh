@@ -12,7 +12,7 @@ function create_work_sym() {
     ln -s /prj/qct/mlsys/markham/scratch/juliray/work ./symwork
 }
 
-alias scratch="cd /prj/qct/mlsys/markham/scratch/juliray"
+alias scratch="cd \"$(scratch_dir)\""
 
 if [[ ! -d ~/.local/share/nvim/avante/rag_service ]]; then
     mkdir -p /tmp/avante-rag-service && chmod 777 /tmp/avante-rag-service

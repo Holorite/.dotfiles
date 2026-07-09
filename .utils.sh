@@ -15,6 +15,19 @@ workspace_dir() {
     esac
 }
 
+# The shared NFS scratch dir for this env — the network-visible big-disk root
+# (as opposed to workspace_dir, which may be host-local). On argos the two are
+# the same path; on devcompute they differ (workspace_dir is local SSD, scratch
+# is the lasvegas NFS mount). Canonical seam — used by the `scratch` alias
+# (zsh/env/<env>.zsh) and by `ptrace` HTTP mode to root its file server.
+scratch_dir() {
+    case "${DOTFILES_ENV:-}" in
+        work-argos)      echo /prj/qct/mlsys/markham/scratch/juliray ;;
+        work-devcompute) echo /prj/qct/mlsys/lasvegas/scratch/juliray ;;
+        *)               echo "$HOME" ;;
+    esac
+}
+
 # Where nvm (and its large node versions) should live.
 # Shared by install/nvm/install.sh and zsh/conf.d/nvm.zsh.
 nvm_dir() {

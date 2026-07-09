@@ -355,10 +355,20 @@ match_notes() {
 #                 first) so the caller picks
 # `--paths-only`/`-p` forces the path<TAB>title list even for a single match
 # (lets scripted callers keep a uniform "0/1/>1 lines" branch).
+#
+# An optional second positional is INSTRUCTIONS for the agent reading the
+# result: on a single match it's emitted as a `> Instructions: ...` blockquote
+# AFTER the body (trailing/most-recent position, least likely to be dropped or
+# truncated), so an agent that ran `vault find "<query>" "<what to do>"` sees the
+# directive last. Because the query is now a single positional (not "$*"),
+# multi-word queries must be quoted. Instructions are omitted from the `-p` path
+# list (machine output) and the multi-match list (preserves the clean "0/1/>1
+# lines" contract).
 cmd_find() {
     local paths_only=""
     [[ "${1:-}" == -p || "${1:-}" == --paths-only ]] && { paths_only=1; shift; }
-    local query="$*"
+    local query="${1:-}"
+    local instructions="${2:-}"
     [[ -n "$query" ]] || die "find: need a query"
 
     local -a hits=()
@@ -374,6 +384,9 @@ cmd_find() {
             else
                 printf '# %s\n\n' "${hits[0]%%$'\t'*}"
                 cat "${hits[0]%%$'\t'*}"
+                # Instructions go LAST (recency): trailing context is least
+                # likely to be dropped/truncated by the agent reading this.
+                [[ -n "$instructions" ]] && printf '\n\n> Instructions: %s\n' "$instructions"
             fi
             ;;
         *) printf '%s\n' "${hits[@]}" ;;
@@ -385,9 +398,11 @@ usage() {
 usage: vault <command> [args]
   dir                         print the vault directory (errors if absent)
   slug [dir]                  derive the project slug from a directory (default: cwd)
-  find [-p] <query>           locate a note by title/filename: 1 match prints its
+  find [-p] <query> [instr]   locate a note by title/filename: 1 match prints its
                               body (-p: path list), >1 prints path<TAB>title lines,
-                              0 exits 1 (MOC index.md rows excluded)
+                              0 exits 1 (MOC index.md rows excluded). Optional
+                              [instr] is emitted as a `> Instructions:` line after
+                              the body on a single match (for an agent reading it)
   reindex                     regenerate all MOC + index link lists from the filesystem
   sync "<msg>"                reindex, then git add -A && commit && push (best-effort)
 
