@@ -197,8 +197,34 @@ _ptrace_http() {
     integer port=$(( base_port + idx ))
 
     local rel=${abs#$root/}
+
+    # HTTP mode ships the trace file across the wire, so a large uncompressed
+    # JSON trace is slow to load. Perfetto sniffs the gzip magic and decompresses
+    # client-side, so serve a gzipped copy when the trace isn't already
+    # compressed — the transfer shrinks ~10x for JSON. Cache the .gz right next to
+    # the original and reuse it while it's newer than its source. The size-based
+    # mode cutoff in ptrace() already ran on the uncompressed size, so the
+    # browser's ~2 GB WASM ceiling is still respected. Perfetto detects gzip by
+    # magic bytes, not filename, so the .gz suffix on fileName is harmless.
+    local serve_abs=$abs
+    if [[ ${abs:l} != *.gz ]]; then
+        local gz=$abs.gz
+        if [[ -f $gz && $gz -nt $abs ]]; then
+            serve_abs=$gz
+        elif command -v gzip >/dev/null 2>&1; then
+            print -P "%F{green}ptrace:%f gzipping trace for faster transfer (one-time)…"
+            if gzip -c "$abs" > "$gz.tmp" 2>/dev/null && mv -f "$gz.tmp" "$gz"; then
+                serve_abs=$gz
+            else
+                rm -f "$gz.tmp"
+                print -u2 "ptrace: gzip failed — serving uncompressed"
+            fi
+        fi
+    fi
+    local serve_rel=${serve_abs#$root/}
+
     local enc
-    enc=$(python3 -c 'import sys,urllib.parse; print(urllib.parse.quote(sys.argv[1]))' "$rel")
+    enc=$(python3 -c 'import sys,urllib.parse; print(urllib.parse.quote(sys.argv[1]))' "$serve_rel")
 
     local idle_secs
     idle_secs=$(_ptrace_secs "$idle")
@@ -266,7 +292,14 @@ function openTrace(){
       done = true; clearInterval(ping);
       window.removeEventListener("message", onMsg);
       win.postMessage({perfetto:{buffer:buf, title:title, fileName:f.split("/").pop()}}, PERFETTO, [buf]);
-      status("Trace sent to Perfetto. You can close this tab.");
+      status("Trace sent to Perfetto. Closing this tab...");
+      // Auto-close once the data is handed off. Browsers only honor close() on
+      // script-opened tabs, so this may be blocked when the launcher was opened
+      // externally (lemonade) — fall back to a manual-close hint if so.
+      setTimeout(function(){
+        window.close();
+        status("Trace sent to Perfetto. You can close this tab.");
+      }, 800);
     };
     window.addEventListener("message", onMsg);
     var ping = setInterval(function(){ if(!done) win.postMessage("PING", PERFETTO); }, 50);
@@ -326,8 +359,23 @@ httpd.serve_forever()
     # Open our launcher page (same-origin fetch + postMessage into Perfetto),
     # not the ?url= deep link — the latter is mixed content (HTTPS UI fetching
     # our http:// trace) and is blocked by the browser.
+    #
+    # Title = the trace's basename, EXCEPT for generically-named traces
+    # (chrometrace.json / sim_trace_final.json, gzipped or not) where the
+    # filename carries no info and the PARENT DIRECTORY encodes what the trace
+    # is — use that instead so tabs are distinguishable. Derive the parent from
+    # the absolute path ($abs), not the root-relative $rel: they usually share a
+    # parent, but if root IS the parent (e.g. PTRACE_ROOT set to the run dir)
+    # $rel:h collapses to "." and the useful name is lost.
+    local title=${abs:t}
+    case ${title%.gz} in
+        chrometrace.json|sim_trace_final.json)
+            local parent=${abs:h:t}
+            [[ -n $parent && $parent != / ]] && title=$parent
+            ;;
+    esac
     local title_enc
-    title_enc=$(python3 -c 'import sys,urllib.parse; print(urllib.parse.quote(sys.argv[1]))' "${rel:t}")
+    title_enc=$(python3 -c 'import sys,urllib.parse; print(urllib.parse.quote(sys.argv[1]))' "$title")
     local url="http://$http_host:$port/__ptrace_open__?f=${enc}&title=${title_enc}"
     print -P "  trace:       %B$rel%b"
     print -P "  then open:   %F{blue}$url%f"
