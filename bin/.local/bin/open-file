@@ -125,10 +125,19 @@ command -v lemonade >/dev/null 2>&1 || die "lemonade not found — is this a wor
 
 echo "open-file: $raw"
 echo "        -> $unc"
-if lemonade open "$unc" 2>/dev/null; then
+# Guard with `timeout`: a STALE tunnel leaves 2489 bound here but its ssh channel
+# dead, so lemonade's connect() succeeds instantly and the write then blocks
+# until ssh keepalive gives up (~45s). lemonade has no timeout of its own, so cap
+# it and fail fast to the die() below. Tunable via $LEMONADE_TIMEOUT (default 5s).
+if command -v timeout >/dev/null 2>&1; then
+    lemonade_open() { timeout "${LEMONADE_TIMEOUT:-5}" lemonade open "$1" 2>/dev/null; }
+else
+    lemonade_open() { lemonade open "$1" 2>/dev/null; }
+fi
+if lemonade_open "$unc"; then
     exit 0
 fi
-die "lemonade open failed — is 'lemonade server' up on the laptop and the
-     RemoteForward 2489 tunnel connected? (see notes/improvements.md)
+die "lemonade open failed or timed out — is 'lemonade server' up on the laptop
+     and the RemoteForward 2489 tunnel connected? (see notes/improvements.md)
      If the tab opened to the wrong place, the SMB share name likely differs
      from the NFS export — add an entry to SHARE_OVERRIDE in this script."

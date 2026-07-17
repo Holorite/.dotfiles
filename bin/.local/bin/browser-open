@@ -35,8 +35,20 @@ fi
 # ── lemonade: relay to the laptop's browser over the ssh -R tunnel ──────────
 # Succeeds only if `lemonade server` is running on the laptop and the
 # RemoteForward is up; otherwise fall through to the printed-link fallback.
+#
+# Guard with `timeout`: a STALE tunnel leaves 2489 bound on this host but its
+# ssh channel dead, so lemonade's connect() to 127.0.0.1:2489 succeeds instantly
+# (sshd accepts locally) and then the forwarded write blocks until ssh keepalive
+# gives up (~45s with ServerAliveInterval 15×3). lemonade has no timeout of its
+# own, so cap it here and drop to the printed-link fallback fast. Tunable via
+# $LEMONADE_TIMEOUT (default 5s).
 if command -v lemonade >/dev/null 2>&1; then
-    if lemonade open "$url" 2>/dev/null; then
+    if command -v timeout >/dev/null 2>&1; then
+        lemonade_open() { timeout "${LEMONADE_TIMEOUT:-5}" lemonade open "$1" 2>/dev/null; }
+    else
+        lemonade_open() { lemonade open "$1" 2>/dev/null; }
+    fi
+    if lemonade_open "$url"; then
         exit 0
     fi
 fi
