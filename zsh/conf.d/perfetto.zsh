@@ -12,21 +12,24 @@
 #   neither CORS nor a CSP exception, and sidesteps the mixed-content block of an
 #   HTTPS UI fetching an http:// trace).
 #
-#   Each invocation starts an EPHEMERAL, SINGLE-FILE server (not the old one-
-#   server-per-root model): it serves ONLY this trace's basename plus the
-#   launcher page — every other path is 404, so no sibling files under the dir
-#   are exposed — and it REAPS ITSELF a few seconds ($PTRACE_HTTP_GRACE, default
-#   30s) after the launcher's fetch delivers the trace. So the file is on the
-#   wire only briefly, for one recipient's click. If the trace is never fetched
-#   (popup blocked / walked away), a short idle FALLBACK reaps the orphan
-#   ($PTRACE_IDLE_TIMEOUT, default 15m for HTTP — much shorter than native's 8h,
-#   since a delivered trace needs no long-lived server). The port is PER-USER
-#   (base $PTRACE_HTTP_PORT 9201 + UID%50, then probe upward for a free one) so
-#   users on a shared host don't collide and the user's own concurrent traces
-#   each get their own port/tab. Viewing N traces = N short-lived servers/tabs.
-#   Reloading the *Perfetto* tab never re-hits our server (the buffer is cached
-#   in-tab post-handshake); only re-opening the launcher would, which the grace
-#   window covers.
+#   ONE per-user server on a FIXED port serves MANY traces by token. Each
+#   invocation registers its trace in a local 0600 registry (token -> abspath)
+#   and ensures the server is up on a fixed port (base $PTRACE_HTTP_PORT 9201 +
+#   UID%50 — no probing, so opening two traces in quick succession CANNOT collide
+#   on a port: the second just adds another token/tab on the SAME port; the
+#   duplicate server it tries to launch exits on EADDRINUSE and the running one
+#   picks up the new token). The server serves ONLY registered tokens at
+#   /t/<token> (looked up by exact token, never by joining user input onto a dir,
+#   so traversal is structurally impossible) plus the launcher — every other path
+#   is 404, and only traces you explicitly `ptrace`'d are reachable. Each entry
+#   is dropped (404 thereafter) ~$PTRACE_HTTP_GRACE (default 30s) after ITS fetch
+#   delivers, so a file is on the wire only for its one click; the server itself
+#   reaps when the registry is empty and idle ($PTRACE_IDLE_TIMEOUT, default 15m
+#   for HTTP — much shorter than native's 8h). Reloading the *Perfetto* tab never
+#   re-hits our server (buffer cached in-tab post-handshake); only re-opening the
+#   launcher would, which the grace window covers. Users on a shared host land in
+#   different UID bands, and registration is a local file the server polls — a
+#   network party can fetch an allowlisted token but cannot add one.
 #   Cost: the file crosses the wire, and the browser's ~2 GB memory ceiling
 #   applies — hence the size cutoff to native mode. NOTE: window.open must ride
 #   a user gesture, so if the browser blocks the auto-popup the launcher page
@@ -53,9 +56,9 @@
 #   ptrace -w <file>       force HTTP (web) mode        (also PTRACE_MODE=http)
 #   ptrace -n <file> [port] force native mode           (also PTRACE_MODE=native)
 #   ptrace -k              kill every ptrace-managed server on this host and stop
-#                          (both HTTP file servers and native RPC servers). Use
-#                          after editing the server body, since a detached old
-#                          server survives the shell and would be reused.
+#                          (both HTTP and native RPC servers) and clear the HTTP
+#                          registry. Use after editing the server body, since a
+#                          detached old server survives the shell and is reused.
 #
 # One-time laptop browser setup: NATIVE mode needs the "Relax CSP for
 # 127.0.0.1:*" flag and a YES on the "Trace Processor native acceleration"
@@ -64,14 +67,15 @@
 #
 # Env:
 #   PTRACE_IDLE_TIMEOUT  inactivity before a server self-reaps. Default differs
-#                        by mode: 15m for HTTP (idle FALLBACK only — HTTP also
-#                        reaps on delivery), 8h for native. "never" disables.
-#   PTRACE_HTTP_GRACE    HTTP mode: seconds after the trace is delivered before
-#                        the single-file server self-reaps (default 30; reset by
-#                        any further GET; "never"/0 disables, leaving only idle).
+#                        by mode: 15m for HTTP (server reaps once its registry is
+#                        empty and idle), 8h for native. "never" disables.
+#   PTRACE_HTTP_GRACE    HTTP mode: seconds after a trace is delivered before its
+#                        registry entry is dropped (404 thereafter) — default 30;
+#                        "never"/0 disables per-entry reap, leaving only idle.
 #   PTRACE_HTTP_MAX      auto-mode size cutoff in MB (default 1800).
 #   PTRACE_HTTP_PORT     base port for HTTP-mode servers (default 9201; the
-#                        actual port is base + UID%50, then probed upward).
+#                        actual per-user port is base + UID%50, fixed — one
+#                        server per user serves all their traces by token).
 #   PTRACE_HTTP_HOST     hostname the UI fetches HTTP-mode traces from (default
 #                        $(hostname)) — set to an FQDN if the short name doesn't
 #                        resolve from the laptop.
@@ -108,10 +112,11 @@ ptrace() {
     done
 
     # -k: reap every ptrace-managed server on this host and stop. Both a
-    # detached HTTP file server (matched by its PTRACE_HTTPD marker) and a
-    # native trace_processor RPC server survive the launching shell, so after
-    # editing the server body the old one lingers and `ptrace` reuses it — this
-    # is the clean way to clear them without hunting PIDs.
+    # detached HTTP server (matched by its PTRACE_HTTPD marker) and a native
+    # trace_processor RPC server survive the launching shell, so after editing
+    # the server body the old one lingers and `ptrace` reuses it — this is the
+    # clean way to clear them without hunting PIDs. Also clears the HTTP
+    # registry so no stale token entries survive the server they belonged to.
     if (( kill_only )); then
         local killed=0
         if pgrep -f PTRACE_HTTPD >/dev/null 2>&1; then
@@ -120,6 +125,8 @@ ptrace() {
         if pgrep -f "trace_processor.*server http" >/dev/null 2>&1; then
             pkill -f "trace_processor.*server http" && killed=1
         fi
+        rm -f "${XDG_CACHE_HOME:-$HOME/.cache}/ptrace/entries/"*.json(N) \
+              "${XDG_CACHE_HOME:-$HOME/.cache}/ptrace/entries/"*.json.tmp(N) 2>/dev/null
         if (( killed )); then
             print -P "%F{green}ptrace:%f killed ptrace-managed servers"
         else
@@ -164,18 +171,23 @@ ptrace() {
     fi
 }
 
-# HTTP (client-side/WASM) mode: an EPHEMERAL, SINGLE-FILE server.
+# HTTP (client-side/WASM) mode: ONE per-user server on a FIXED port, serving
+# MANY traces by token.
 #
-# Unlike the old per-root model (one long-lived server exposing every file under
-# scratch/workspace for 8h), each `ptrace` invocation starts a server that:
-#   - serves EXACTLY ONE file (the trace) plus the launcher page — every other
-#     path is 404, so no sibling files are reachable;
-#   - REAPS ITSELF seconds after the trace is delivered (the launcher's fetch
-#     completing is the signal), so the file is on the wire only briefly;
-#   - binds a PER-USER port (base + UID%N, then probe upward for a free one) so
-#     users on a shared host don't collide.
-# It still binds 0.0.0.0 and is reached by hostname (no ssh tunnel), preserving
-# the shareable story. The security win is scope + lifetime, not the transport.
+# Each `ptrace` registers its trace in a local 0600 registry (a token -> abspath
+# entry file) and ensures the per-user server is up on a FIXED port (base +
+# UID%50 — no probing, so opening two traces in quick succession can't collide:
+# the second just adds another token/tab on the SAME port). The server polls the
+# registry and serves ONLY registered tokens at /t/<token> (plus the launcher at
+# /__ptrace_open__) — every other path is 404, and paths are looked up by exact
+# token, never by joining user input onto a dir, so traversal is structurally
+# impossible and only traces you explicitly `ptrace`'d are reachable. Each entry
+# is dropped (404 thereafter) ~$PTRACE_HTTP_GRACE (default 30s) after ITS fetch
+# delivers, so a file is on the wire only for its one click; the server itself
+# reaps when the registry is empty and idle ($PTRACE_IDLE_TIMEOUT, default 15m).
+# It binds 0.0.0.0 and is reached by hostname (no ssh tunnel), preserving the
+# shareable story. Registration is a local file the server polls — a network
+# party can fetch an allowlisted token but cannot add one.
 _ptrace_http() {
     local file="$1" idle="${2:-15m}"
 
@@ -185,16 +197,16 @@ _ptrace_http() {
     fi
 
     local abs=${file:A}
-    local dir=${abs:h}
 
     # HTTP mode ships the trace file across the wire, so a large uncompressed
     # JSON trace is slow to load. Perfetto sniffs the gzip magic and decompresses
     # client-side, so serve a gzipped copy when the trace isn't already
     # compressed — the transfer shrinks ~10x for JSON. Cache the .gz right next to
-    # the original (same dir) and reuse it while it's newer than its source. The
-    # size-based mode cutoff in ptrace() already ran on the uncompressed size, so
-    # the browser's ~2 GB WASM ceiling is still respected. Perfetto detects gzip
-    # by magic bytes, not filename, so the .gz suffix on fileName is harmless.
+    # the original and reuse it while it's newer than its source. The size-based
+    # mode cutoff in ptrace() already ran on the uncompressed size, so the
+    # browser's ~2 GB WASM ceiling is still respected. Perfetto detects gzip by
+    # magic bytes, not filename, so serving it with a neutral content-type (no
+    # Content-Encoding) is correct — the browser hands the raw gzip to the WASM.
     local serve_abs=$abs
     if [[ ${abs:l} != *.gz ]]; then
         local gz=$abs.gz
@@ -210,64 +222,100 @@ _ptrace_http() {
             fi
         fi
     fi
-    # The one file the server will hand out (its basename, since we chdir to $dir).
-    local basename=${serve_abs:t}
-
-    local enc
-    enc=$(python3 -c 'import sys,urllib.parse; print(urllib.parse.quote(sys.argv[1]))' "$basename")
 
     local idle_secs grace_secs
     idle_secs=$(_ptrace_secs "$idle")
     grace_secs=$(_ptrace_secs "${PTRACE_HTTP_GRACE:-30}")
 
-    # Per-user base port (base + UID%N) so two users on a shared host land in
-    # different bands, then probe upward for the first actually-free port so the
-    # user's own concurrent traces each get their own server/tab. Servers are
-    # ephemeral (reap-on-delivery), so a lost probe->bind race just means
-    # re-running ptrace.
+    # Fixed per-user port (base + UID%50): users on a shared host land in
+    # different bands, and a single user's repeated opens all reuse the SAME
+    # port/server — so rapid successive traces never fight over a port.
     local base_port=${PTRACE_HTTP_PORT:-9201}
     integer uid=$(id -u)
-    integer start_port=$(( base_port + uid % 50 ))
-    integer port
-    port=$(python3 -c '
-import socket, sys
-start = int(sys.argv[1])
-for p in range(start, start + 40):
-    s = socket.socket()
-    try:
-        s.bind(("0.0.0.0", p)); s.close(); print(p); break
-    except OSError:
-        s.close()
-else:
-    print(start)
-' "$start_port")
+    integer port=$(( base_port + uid % 50 ))
 
-    # Host the laptop browser fetches from. Defaults to this host's name (so no
-    # ssh tunnel is needed — the browser reaches the work host directly on the
-    # corp network); override with $PTRACE_HTTP_HOST (e.g. an FQDN).
+    # Per-user registry: a private dir of token->trace entry files the server
+    # polls. 0700 so no other user can read your trace paths or inject a token.
+    local reg="${XDG_CACHE_HOME:-$HOME/.cache}/ptrace"
+    mkdir -p "$reg/entries" 2>/dev/null
+    chmod 700 "$reg" "$reg/entries" 2>/dev/null
+
+    # Title = the trace's basename, EXCEPT for generically-named traces
+    # (chrometrace.json / sim_trace_final.json, gzipped or not) where the
+    # filename carries no info and the PARENT DIRECTORY encodes what the trace is.
+    local title=${abs:t}
+    case ${title%.gz} in
+        chrometrace.json|sim_trace_final.json)
+            local parent=${abs:h:t}
+            [[ -n $parent && $parent != / ]] && title=$parent
+            ;;
+    esac
+
+    # Register this trace and get its token (atomic write: tmp then rename, so the
+    # polling server never reads a half-written entry). "name" is the fileName
+    # shown in Perfetto (the original, un-gzipped basename).
+    local reg_py='
+import sys, os, json, time, secrets
+ed, path, title, name = sys.argv[1], sys.argv[2], sys.argv[3], sys.argv[4]
+tok = secrets.token_urlsafe(9)
+rec = {"path": os.path.abspath(path), "title": title, "name": name, "added": time.time()}
+tmp = os.path.join(ed, tok + ".json.tmp"); fin = os.path.join(ed, tok + ".json")
+with open(tmp, "w") as f: f.write(json.dumps(rec))
+os.chmod(tmp, 0o600); os.replace(tmp, fin)
+print(tok)
+'
+    local token
+    token=$(python3 -c "$reg_py" "$reg/entries" "$serve_abs" "$title" "${abs:t}") || {
+        print -u2 "ptrace: failed to register trace"; return 1
+    }
+
     local http_host=${PTRACE_HTTP_HOST:-$(hostname)}
 
-    # Ephemeral single-file server. argv: PTRACE_HTTPD <dir> <port> <idle> <grace> <basename>.
-    # chdir to <dir> and serve ONLY <basename> and the /__ptrace_open__ launcher
-    # page (everything else -> 404), so no sibling files are exposed. The launcher
-    # drives Perfetto's postMessage protocol (window.open the UI, PING/PONG
-    # handshake, fetch the trace as an ArrayBuffer from THIS same-origin server,
-    # post it in). postMessage sidesteps the mixed-content wall the old ?url= deep
-    # link hit: an HTTPS ui.perfetto.dev cannot fetch our http:// trace, but our
-    # http:// page can, then hands the bytes over the window channel — so no CSP
-    # flag and no CORS are needed (the CORS header is kept anyway, cheap). A
-    # watchdog reaps the server <grace>s after the trace GET completes (the
-    # delivery signal; reset by any further GET), and <idle>s after the last GET
-    # as an orphan fallback (popup blocked / walked away). grace=0 or idle=0
-    # ("never") disables that leg.
+    # Server. argv: PTRACE_HTTPD <reg> <port> <idle> <grace>. Polls <reg>/entries
+    # once a second: adds new tokens to the allowlist, drops entries whose files
+    # were removed, and reaps per-entry (delivered + grace, or never-fetched +
+    # idle). Serves /t/<token> (streamed from the entry's abspath) and the
+    # /__ptrace_open__ launcher; everything else 404. The launcher drives
+    # Perfetto's postMessage protocol (window.open the UI, PING/PONG handshake,
+    # fetch /t/<token> as an ArrayBuffer from THIS same-origin server, post it in)
+    # — sidestepping the mixed-content wall an HTTPS UI hits fetching an http://
+    # trace, so no CSP flag and no CORS. On startup it tries to bind the fixed
+    # port; if another of our servers already holds it (EADDRINUSE) it exits — the
+    # running one will pick up our just-registered token. Self-reaps when the
+    # allowlist is empty and idle.
     local server_py='
-import sys, os, time, threading
+import sys, os, time, json, glob, shutil, threading
 from http.server import HTTPServer, SimpleHTTPRequestHandler
-from urllib.parse import unquote
-srvdir, port, idle, grace, name = sys.argv[2], int(sys.argv[3]), int(sys.argv[4]), int(sys.argv[5]), sys.argv[6]
-os.chdir(srvdir)
+from urllib.parse import unquote, parse_qs, urlsplit
+reg, port, idle, grace = sys.argv[2], int(sys.argv[3]), int(sys.argv[4]), int(sys.argv[5])
+ed = os.path.join(reg, "entries")
+os.makedirs(ed, exist_ok=True)
+allow = {}          # token -> record (with mutable "delivered")
 last = [time.time()]
-delivered = [0.0]   # 0 until the trace file is delivered; then last-delivery time
+def scan():
+    seen = set()
+    for fp in glob.glob(os.path.join(ed, "*.json")):
+        tok = os.path.basename(fp)[:-5]; seen.add(tok)
+        if tok not in allow:
+            try: rec = json.load(open(fp))
+            except Exception: continue
+            rec["delivered"] = None; allow[tok] = rec
+    for tok in list(allow):
+        if tok not in seen: allow.pop(tok, None)
+def reap():
+    now = time.time()
+    for tok, rec in list(allow.items()):
+        d = rec.get("delivered")
+        expired = (d and grace > 0 and now - d > grace) or \
+                  (not d and idle > 0 and now - rec.get("added", now) > idle)
+        if expired:
+            try: os.remove(os.path.join(ed, tok + ".json"))
+            except OSError: pass
+            allow.pop(tok, None)
+def maintain():
+    while True:
+        time.sleep(1); scan(); reap()
+        if not allow and idle > 0 and time.time() - last[0] > idle: os._exit(0)
 LAUNCHER = """<!doctype html>
 <html><head><meta charset="utf-8"><title>ptrace to Perfetto</title>
 <style>
@@ -283,17 +331,17 @@ code{background:#f0f0f0;padding:.1rem .3rem;border-radius:3px}
 <script>
 var PERFETTO = "https://ui.perfetto.dev";
 var params = new URLSearchParams(location.search);
-var f = params.get("f") || "";
-var title = params.get("title") || f;
-document.getElementById("n").textContent = f;
+var tok = params.get("t") || "";
+var title = params.get("title") || tok;
+var name = params.get("n") || title;
+document.getElementById("n").textContent = title;
 function status(m){ document.getElementById("s").textContent = m; }
 function openTrace(){
   var win = window.open(PERFETTO);
   if(!win){ status("Popup blocked. Allow popups for this page, then click the button above."); return; }
   status("Opening Perfetto and fetching trace...");
-  var traceUrl = "/" + f.split("/").map(encodeURIComponent).join("/");
-  fetch(traceUrl).then(function(r){
-    if(!r.ok) throw new Error("fetch failed: " + r.status);
+  fetch("/t/" + encodeURIComponent(tok)).then(function(r){
+    if(!r.ok) throw new Error("fetch failed: " + r.status + " (trace may have expired — re-run ptrace)");
     return r.arrayBuffer();
   }).then(function(buf){
     status("Fetched " + Math.round(buf.byteLength/1048576) + " MB. Handshaking with Perfetto...");
@@ -302,7 +350,7 @@ function openTrace(){
       if(e.data !== "PONG") return;
       done = true; clearInterval(ping);
       window.removeEventListener("message", onMsg);
-      win.postMessage({perfetto:{buffer:buf, title:title, fileName:f.split("/").pop()}}, PERFETTO, [buf]);
+      win.postMessage({perfetto:{buffer:buf, title:title, fileName:name}}, PERFETTO, [buf]);
       status("Trace sent to Perfetto. Closing this tab...");
       // Auto-close once the data is handed off. Browsers only honor close() on
       // script-opened tabs, so this may be blocked when the launcher was opened
@@ -322,78 +370,68 @@ openTrace();
 </script></body></html>
 """
 class H(SimpleHTTPRequestHandler):
-    def end_headers(self):
-        self.send_header("Access-Control-Allow-Origin", "https://ui.perfetto.dev")
-        super().end_headers()
+    def _send_html(self, body):
+        self.send_response(200)
+        self.send_header("Content-Type", "text/html; charset=utf-8")
+        self.send_header("Content-Length", str(len(body)))
+        self.end_headers(); self.wfile.write(body)
     def do_GET(self):
         last[0] = time.time()
-        path = unquote(self.path.split("?")[0])
+        path = unquote(urlsplit(self.path).path)
         if path == "/__ptrace_open__":
-            body = LAUNCHER.encode("utf-8")
+            self._send_html(LAUNCHER.encode("utf-8")); return
+        if path.startswith("/t/"):
+            rec = allow.get(path[3:])
+            if not rec: self.send_error(404); return
+            try:
+                f = open(rec["path"], "rb"); sz = os.fstat(f.fileno()).st_size
+            except OSError:
+                self.send_error(404); return
             self.send_response(200)
-            self.send_header("Content-Type", "text/html; charset=utf-8")
-            self.send_header("Content-Length", str(len(body)))
+            self.send_header("Access-Control-Allow-Origin", "https://ui.perfetto.dev")
+            self.send_header("Content-Type", "application/octet-stream")
+            self.send_header("Content-Length", str(sz))
             self.end_headers()
-            self.wfile.write(body)
-            return
-        # Single-file allowlist: only the trace basename is served; the leading
-        # "/" and exact match block traversal and sibling-file reads.
-        if path == "/" + name:
-            super().do_GET()
-            delivered[0] = time.time()   # full body written -> delivered
+            try: shutil.copyfileobj(f, self.wfile)
+            finally: f.close()
+            rec["delivered"] = time.time()   # full body written -> delivered
             return
         self.send_error(404)
-    def do_OPTIONS(self):
-        self.send_response(200)
-        self.send_header("Access-Control-Allow-Methods", "GET, OPTIONS")
-        self.send_header("Access-Control-Allow-Headers", "*")
-        self.end_headers()
     def log_message(self, *a): pass
-httpd = HTTPServer(("0.0.0.0", port), H)
-if grace > 0 or idle > 0:
-    def watchdog():
-        while True:
-            time.sleep(5)
-            now = time.time()
-            if delivered[0] and grace > 0 and now - delivered[0] > grace: os._exit(0)
-            if idle > 0 and now - last[0] > idle: os._exit(0)
-    threading.Thread(target=watchdog, daemon=True).start()
+scan()
+try:
+    httpd = HTTPServer(("0.0.0.0", port), H)
+except OSError:
+    os._exit(0)   # another of our servers already holds the port; it will serve us
+threading.Thread(target=maintain, daemon=True).start()
 httpd.serve_forever()
 '
-    # Detach into its own session (setsid) with stdio fully closed, so the
-    # server outlives the shell/ssh session that ran ptrace — closing the
-    # terminal won't SIGHUP it before the trace is delivered. It reaps itself on
-    # delivery (or the idle fallback); `ptrace -k` clears any strays. Fall back
-    # to a plain background job if setsid is absent (disown keeps it off this
-    # shell's job table).
-    if command -v setsid >/dev/null 2>&1; then
-        setsid python3 -c "$server_py" PTRACE_HTTPD "$dir" "$port" "$idle_secs" "$grace_secs" "$basename" \
-            </dev/null >/dev/null 2>&1 &
+    # Is our server already up on this port? (matched by marker+reg in argv).
+    if pgrep -f "PTRACE_HTTPD $reg $port" >/dev/null 2>&1; then
+        print -P "%F{green}ptrace:%f added to running server on $http_host:$port (reaps ~${grace_secs}s after open)"
     else
-        python3 -c "$server_py" PTRACE_HTTPD "$dir" "$port" "$idle_secs" "$grace_secs" "$basename" \
-            </dev/null >/dev/null 2>&1 &
+        # Detach into its own session (setsid), stdio closed, so the server
+        # outlives the shell/ssh session — closing the terminal won't SIGHUP it.
+        # It self-reaps when idle+empty; `ptrace -k` clears it and the registry.
+        # (A duplicate launch from a racing shell just exits on EADDRINUSE.)
+        if command -v setsid >/dev/null 2>&1; then
+            setsid python3 -c "$server_py" PTRACE_HTTPD "$reg" "$port" "$idle_secs" "$grace_secs" \
+                </dev/null >/dev/null 2>&1 &
+        else
+            python3 -c "$server_py" PTRACE_HTTPD "$reg" "$port" "$idle_secs" "$grace_secs" \
+                </dev/null >/dev/null 2>&1 &
+        fi
+        disown 2>/dev/null
+        print -P "%F{green}ptrace:%f serving on $http_host:$port (per-user; reaps ~${grace_secs}s after open, idle $idle)"
     fi
-    disown 2>/dev/null
-    print -P "%F{green}ptrace:%f serving %B$basename%b on $http_host:$port (single-file; reaps ~${grace_secs}s after open, idle fallback $idle)"
 
-    # Open our launcher page (same-origin fetch + postMessage into Perfetto),
-    # not the ?url= deep link — the latter is mixed content (HTTPS UI fetching
-    # our http:// trace) and is blocked by the browser.
-    #
-    # Title = the trace's basename, EXCEPT for generically-named traces
-    # (chrometrace.json / sim_trace_final.json, gzipped or not) where the
-    # filename carries no info and the PARENT DIRECTORY encodes what the trace
-    # is — use that instead so tabs are distinguishable.
-    local title=${abs:t}
-    case ${title%.gz} in
-        chrometrace.json|sim_trace_final.json)
-            local parent=${abs:h:t}
-            [[ -n $parent && $parent != / ]] && title=$parent
-            ;;
-    esac
-    local title_enc
+    # Open our launcher page (same-origin fetch + postMessage into Perfetto), not
+    # the ?url= deep link — the latter is mixed content (HTTPS UI fetching our
+    # http:// trace) and is blocked by the browser.
+    local title_enc name_enc
     title_enc=$(python3 -c 'import sys,urllib.parse; print(urllib.parse.quote(sys.argv[1]))' "$title")
-    local url="http://$http_host:$port/__ptrace_open__?f=${enc}&title=${title_enc}"
+    name_enc=$(python3 -c 'import sys,urllib.parse; print(urllib.parse.quote(sys.argv[1]))' "${abs:t}")
+    local url="http://$http_host:$port/__ptrace_open__?t=${token}&title=${title_enc}&n=${name_enc}"
     print -P "  trace:       %B$abs%b"
     print -P "  then open:   %F{blue}$url%f"
     command -v browser-open >/dev/null 2>&1 && browser-open "$url" >/dev/null 2>&1 || true
