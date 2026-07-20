@@ -5,20 +5,28 @@
 #   that drives Perfetto's postMessage protocol: it window.open()s the UI,
 #   fetches the trace from THIS same-origin server as an ArrayBuffer, and posts
 #   it into the UI tab (PING/PONG handshake first). The browser parses it
-#   client-side (WASM), caching it thereafter. The win: ONE server per root
-#   serves every trace under that root, so N traces under a root = N tabs. The
-#   server binds 0.0.0.0 and the URL points at this host by NAME ($(hostname),
-#   override $PTRACE_HTTP_HOST), so the laptop browser reaches it directly over
-#   the corp network — NO ssh tunnel, and NO "Relax CSP" flag (postMessage,
-#   unlike the old ?url= deep link, needs neither CORS nor a CSP exception, and
-#   sidesteps the mixed-content block of an HTTPS UI fetching an http:// trace).
-#   The trace's root is whichever of `scratch_dir` / `workspace_dir` contains
-#   it, and each root gets its own fixed port (base $PTRACE_HTTP_PORT, 9201) so
-#   a scratch server and a workspace server coexist rather than fight over one
-#   port. Re-running under the same root reuses its server; there's nothing to
-#   swap or reap. The server is detached (setsid), so it persists past the
-#   shell/ssh session that launched it — closing the terminal won't kill it; it
-#   stays up until its idle watchdog fires.
+#   client-side (WASM), caching it thereafter. The server binds 0.0.0.0 and the
+#   URL points at this host by NAME ($(hostname), override $PTRACE_HTTP_HOST), so
+#   the laptop browser reaches it directly over the corp network — NO ssh tunnel,
+#   and NO "Relax CSP" flag (postMessage, unlike the old ?url= deep link, needs
+#   neither CORS nor a CSP exception, and sidesteps the mixed-content block of an
+#   HTTPS UI fetching an http:// trace).
+#
+#   Each invocation starts an EPHEMERAL, SINGLE-FILE server (not the old one-
+#   server-per-root model): it serves ONLY this trace's basename plus the
+#   launcher page — every other path is 404, so no sibling files under the dir
+#   are exposed — and it REAPS ITSELF a few seconds ($PTRACE_HTTP_GRACE, default
+#   30s) after the launcher's fetch delivers the trace. So the file is on the
+#   wire only briefly, for one recipient's click. If the trace is never fetched
+#   (popup blocked / walked away), a short idle FALLBACK reaps the orphan
+#   ($PTRACE_IDLE_TIMEOUT, default 15m for HTTP — much shorter than native's 8h,
+#   since a delivered trace needs no long-lived server). The port is PER-USER
+#   (base $PTRACE_HTTP_PORT 9201 + UID%50, then probe upward for a free one) so
+#   users on a shared host don't collide and the user's own concurrent traces
+#   each get their own port/tab. Viewing N traces = N short-lived servers/tabs.
+#   Reloading the *Perfetto* tab never re-hits our server (the buffer is cached
+#   in-tab post-handshake); only re-opening the launcher would, which the grace
+#   window covers.
 #   Cost: the file crosses the wire, and the browser's ~2 GB memory ceiling
 #   applies — hence the size cutoff to native mode. NOTE: window.open must ride
 #   a user gesture, so if the browser blocks the auto-popup the launcher page
@@ -55,15 +63,18 @@
 # if the browser blocks the first window.open (or click the launcher button).
 #
 # Env:
-#   PTRACE_IDLE_TIMEOUT  inactivity before a server self-reaps (default 8h;
-#                        "never" disables). Resets on UI activity. Both modes.
+#   PTRACE_IDLE_TIMEOUT  inactivity before a server self-reaps. Default differs
+#                        by mode: 15m for HTTP (idle FALLBACK only — HTTP also
+#                        reaps on delivery), 8h for native. "never" disables.
+#   PTRACE_HTTP_GRACE    HTTP mode: seconds after the trace is delivered before
+#                        the single-file server self-reaps (default 30; reset by
+#                        any further GET; "never"/0 disables, leaving only idle).
 #   PTRACE_HTTP_MAX      auto-mode size cutoff in MB (default 1800).
 #   PTRACE_HTTP_PORT     base port for HTTP-mode servers (default 9201; the
-#                        second root uses +1).
+#                        actual port is base + UID%50, then probed upward).
 #   PTRACE_HTTP_HOST     hostname the UI fetches HTTP-mode traces from (default
 #                        $(hostname)) — set to an FQDN if the short name doesn't
 #                        resolve from the laptop.
-#   PTRACE_ROOT          override the HTTP-mode file-server root (sole candidate).
 #   PTRACE_MODE          "http" or "native" to set the default mode.
 
 # Parse a duration (8h / 30m / 90s / 90 / never) to whole seconds; "never" -> 0.
@@ -119,7 +130,9 @@ ptrace() {
 
     local file="${1:-}"
     local port="${2:-9001}"
-    local idle="${PTRACE_IDLE_TIMEOUT:-8h}"
+    # Empty unless explicitly set, so each mode applies its own default (HTTP now
+    # reaps on delivery, so it wants a short idle FALLBACK; native still wants 8h).
+    local idle="${PTRACE_IDLE_TIMEOUT:-}"
 
     if [[ -z "$file" ]]; then
         print -u2 "usage: ptrace [-w|-n] <trace-file> [port]   |   ptrace -k  (kill all servers)"
@@ -151,10 +164,20 @@ ptrace() {
     fi
 }
 
-# HTTP (client-side/WASM) mode: single CORS file server on 127.0.0.1:9001,
-# rooted at the scratch/workspace dir containing the trace.
+# HTTP (client-side/WASM) mode: an EPHEMERAL, SINGLE-FILE server.
+#
+# Unlike the old per-root model (one long-lived server exposing every file under
+# scratch/workspace for 8h), each `ptrace` invocation starts a server that:
+#   - serves EXACTLY ONE file (the trace) plus the launcher page — every other
+#     path is 404, so no sibling files are reachable;
+#   - REAPS ITSELF seconds after the trace is delivered (the launcher's fetch
+#     completing is the signal), so the file is on the wire only briefly;
+#   - binds a PER-USER port (base + UID%N, then probe upward for a free one) so
+#     users on a shared host don't collide.
+# It still binds 0.0.0.0 and is reached by hostname (no ssh tunnel), preserving
+# the shareable story. The security win is scope + lifetime, not the transport.
 _ptrace_http() {
-    local file="$1" idle="$2"
+    local file="$1" idle="${2:-15m}"
 
     if ! command -v python3 >/dev/null 2>&1; then
         print -u2 "ptrace: python3 not found (needed for HTTP mode) — use -n for native mode"
@@ -162,50 +185,16 @@ _ptrace_http() {
     fi
 
     local abs=${file:A}
-
-    # Candidate roots, in a STABLE order so each maps to a fixed port:
-    #   scratch_dir -> $PTRACE_HTTP_PORT (9201), workspace_dir -> +1, ...
-    # PTRACE_ROOT, if set, is the sole candidate on the base port. A per-root
-    # port lets a scratch server and a workspace server coexist (each its own
-    # tab + its own -L), instead of one server fighting over a single port.
-    local base_port=${PTRACE_HTTP_PORT:-9201}
-    local -a candidates
-    if [[ -n ${PTRACE_ROOT:-} ]]; then
-        candidates=("$PTRACE_ROOT")
-    else
-        candidates=("$(scratch_dir)" "$(workspace_dir)")
-    fi
-
-    # Pick the deepest candidate that is a path-prefix of the trace; its index
-    # in the list fixes the port.
-    local root="" c cabs
-    integer i=0 idx=-1 best=-1
-    for c in $candidates; do
-        cabs=${c:A}
-        if [[ $abs == $cabs || $abs == $cabs/* ]]; then
-            if (( ${#cabs} > best )); then
-                best=${#cabs}; root=$cabs; idx=$i
-            fi
-        fi
-        (( i++ ))
-    done
-    if [[ -z $root ]]; then
-        print -u2 "ptrace: trace is not under scratch_dir ($(scratch_dir)) or workspace_dir ($(workspace_dir))."
-        print -u2 "        symlink it under one, set PTRACE_ROOT, or use native mode: ptrace -n $file"
-        return 1
-    fi
-    integer port=$(( base_port + idx ))
-
-    local rel=${abs#$root/}
+    local dir=${abs:h}
 
     # HTTP mode ships the trace file across the wire, so a large uncompressed
     # JSON trace is slow to load. Perfetto sniffs the gzip magic and decompresses
     # client-side, so serve a gzipped copy when the trace isn't already
     # compressed — the transfer shrinks ~10x for JSON. Cache the .gz right next to
-    # the original and reuse it while it's newer than its source. The size-based
-    # mode cutoff in ptrace() already ran on the uncompressed size, so the
-    # browser's ~2 GB WASM ceiling is still respected. Perfetto detects gzip by
-    # magic bytes, not filename, so the .gz suffix on fileName is harmless.
+    # the original (same dir) and reuse it while it's newer than its source. The
+    # size-based mode cutoff in ptrace() already ran on the uncompressed size, so
+    # the browser's ~2 GB WASM ceiling is still respected. Perfetto detects gzip
+    # by magic bytes, not filename, so the .gz suffix on fileName is harmless.
     local serve_abs=$abs
     if [[ ${abs:l} != *.gz ]]; then
         local gz=$abs.gz
@@ -221,42 +210,64 @@ _ptrace_http() {
             fi
         fi
     fi
-    local serve_rel=${serve_abs#$root/}
+    # The one file the server will hand out (its basename, since we chdir to $dir).
+    local basename=${serve_abs:t}
 
     local enc
-    enc=$(python3 -c 'import sys,urllib.parse; print(urllib.parse.quote(sys.argv[1]))' "$serve_rel")
+    enc=$(python3 -c 'import sys,urllib.parse; print(urllib.parse.quote(sys.argv[1]))' "$basename")
 
-    local idle_secs
+    local idle_secs grace_secs
     idle_secs=$(_ptrace_secs "$idle")
+    grace_secs=$(_ptrace_secs "${PTRACE_HTTP_GRACE:-30}")
+
+    # Per-user base port (base + UID%N) so two users on a shared host land in
+    # different bands, then probe upward for the first actually-free port so the
+    # user's own concurrent traces each get their own server/tab. Servers are
+    # ephemeral (reap-on-delivery), so a lost probe->bind race just means
+    # re-running ptrace.
+    local base_port=${PTRACE_HTTP_PORT:-9201}
+    integer uid=$(id -u)
+    integer start_port=$(( base_port + uid % 50 ))
+    integer port
+    port=$(python3 -c '
+import socket, sys
+start = int(sys.argv[1])
+for p in range(start, start + 40):
+    s = socket.socket()
+    try:
+        s.bind(("0.0.0.0", p)); s.close(); print(p); break
+    except OSError:
+        s.close()
+else:
+    print(start)
+' "$start_port")
 
     # Host the laptop browser fetches from. Defaults to this host's name (so no
     # ssh tunnel is needed — the browser reaches the work host directly on the
     # corp network); override with $PTRACE_HTTP_HOST (e.g. an FQDN).
     local http_host=${PTRACE_HTTP_HOST:-$(hostname)}
 
-    # Is our server for THIS root already up on its port? Match the marker+root
-    # in the process args (each server is launched as `... PTRACE_HTTPD <root> ...`).
-    if pgrep -f "PTRACE_HTTPD $root " >/dev/null 2>&1; then
-        print -P "%F{green}ptrace:%f reusing HTTP server on $http_host:$port (root %B$root%b)"
-    else
-        # Long-lived file server. argv: PTRACE_HTTPD <root> <port> <idle_secs>.
-        # Binds 0.0.0.0 so the laptop browser can reach it by hostname (no
-        # tunnel). Serves two things: (1) the raw trace files under <root>, and
-        # (2) a tiny launcher page at /__ptrace_open__ that drives Perfetto's
-        # postMessage protocol (window.open the UI, PING/PONG handshake, fetch
-        # the trace as an ArrayBuffer from THIS same-origin server, post it in).
-        # postMessage sidesteps the mixed-content wall the old ?url= deep link
-        # hit: an HTTPS ui.perfetto.dev cannot fetch our http:// trace, but our
-        # http:// page can, then hands the bytes over the window channel — so no
-        # CSP flag and no CORS are needed. The CORS header is kept anyway (cheap,
-        # and lets a manual ?url= still work). A watchdog thread self-reaps after
-        # idle_secs of no GET (0 = never).
-        local server_py='
+    # Ephemeral single-file server. argv: PTRACE_HTTPD <dir> <port> <idle> <grace> <basename>.
+    # chdir to <dir> and serve ONLY <basename> and the /__ptrace_open__ launcher
+    # page (everything else -> 404), so no sibling files are exposed. The launcher
+    # drives Perfetto's postMessage protocol (window.open the UI, PING/PONG
+    # handshake, fetch the trace as an ArrayBuffer from THIS same-origin server,
+    # post it in). postMessage sidesteps the mixed-content wall the old ?url= deep
+    # link hit: an HTTPS ui.perfetto.dev cannot fetch our http:// trace, but our
+    # http:// page can, then hands the bytes over the window channel — so no CSP
+    # flag and no CORS are needed (the CORS header is kept anyway, cheap). A
+    # watchdog reaps the server <grace>s after the trace GET completes (the
+    # delivery signal; reset by any further GET), and <idle>s after the last GET
+    # as an orphan fallback (popup blocked / walked away). grace=0 or idle=0
+    # ("never") disables that leg.
+    local server_py='
 import sys, os, time, threading
 from http.server import HTTPServer, SimpleHTTPRequestHandler
-root, port, idle = sys.argv[2], int(sys.argv[3]), int(sys.argv[4])
-os.chdir(root)
+from urllib.parse import unquote
+srvdir, port, idle, grace, name = sys.argv[2], int(sys.argv[3]), int(sys.argv[4]), int(sys.argv[5]), sys.argv[6]
+os.chdir(srvdir)
 last = [time.time()]
+delivered = [0.0]   # 0 until the trace file is delivered; then last-delivery time
 LAUNCHER = """<!doctype html>
 <html><head><meta charset="utf-8"><title>ptrace to Perfetto</title>
 <style>
@@ -316,7 +327,8 @@ class H(SimpleHTTPRequestHandler):
         super().end_headers()
     def do_GET(self):
         last[0] = time.time()
-        if self.path.split("?")[0] == "/__ptrace_open__":
+        path = unquote(self.path.split("?")[0])
+        if path == "/__ptrace_open__":
             body = LAUNCHER.encode("utf-8")
             self.send_response(200)
             self.send_header("Content-Type", "text/html; charset=utf-8")
@@ -324,7 +336,13 @@ class H(SimpleHTTPRequestHandler):
             self.end_headers()
             self.wfile.write(body)
             return
-        super().do_GET()
+        # Single-file allowlist: only the trace basename is served; the leading
+        # "/" and exact match block traversal and sibling-file reads.
+        if path == "/" + name:
+            super().do_GET()
+            delivered[0] = time.time()   # full body written -> delivered
+            return
+        self.send_error(404)
     def do_OPTIONS(self):
         self.send_response(200)
         self.send_header("Access-Control-Allow-Methods", "GET, OPTIONS")
@@ -332,29 +350,31 @@ class H(SimpleHTTPRequestHandler):
         self.end_headers()
     def log_message(self, *a): pass
 httpd = HTTPServer(("0.0.0.0", port), H)
-if idle > 0:
+if grace > 0 or idle > 0:
     def watchdog():
         while True:
-            time.sleep(min(idle, 60))
-            if time.time() - last[0] > idle: os._exit(0)
+            time.sleep(5)
+            now = time.time()
+            if delivered[0] and grace > 0 and now - delivered[0] > grace: os._exit(0)
+            if idle > 0 and now - last[0] > idle: os._exit(0)
     threading.Thread(target=watchdog, daemon=True).start()
 httpd.serve_forever()
 '
-        # Detach into its own session (setsid) with stdio fully closed, so the
-        # server outlives the shell/ssh session that ran ptrace — closing the
-        # terminal won't SIGHUP it. It stays up until its idle watchdog fires
-        # (or it's killed). Fall back to a plain background job if setsid is
-        # absent (disown then keeps it off this shell's job table).
-        if command -v setsid >/dev/null 2>&1; then
-            setsid python3 -c "$server_py" PTRACE_HTTPD "$root" "$port" "$idle_secs" \
-                </dev/null >/dev/null 2>&1 &
-        else
-            python3 -c "$server_py" PTRACE_HTTPD "$root" "$port" "$idle_secs" \
-                </dev/null >/dev/null 2>&1 &
-        fi
-        disown 2>/dev/null
-        print -P "%F{green}ptrace:%f serving %B$root%b on $http_host:$port (idle-timeout $idle)"
+    # Detach into its own session (setsid) with stdio fully closed, so the
+    # server outlives the shell/ssh session that ran ptrace — closing the
+    # terminal won't SIGHUP it before the trace is delivered. It reaps itself on
+    # delivery (or the idle fallback); `ptrace -k` clears any strays. Fall back
+    # to a plain background job if setsid is absent (disown keeps it off this
+    # shell's job table).
+    if command -v setsid >/dev/null 2>&1; then
+        setsid python3 -c "$server_py" PTRACE_HTTPD "$dir" "$port" "$idle_secs" "$grace_secs" "$basename" \
+            </dev/null >/dev/null 2>&1 &
+    else
+        python3 -c "$server_py" PTRACE_HTTPD "$dir" "$port" "$idle_secs" "$grace_secs" "$basename" \
+            </dev/null >/dev/null 2>&1 &
     fi
+    disown 2>/dev/null
+    print -P "%F{green}ptrace:%f serving %B$basename%b on $http_host:$port (single-file; reaps ~${grace_secs}s after open, idle fallback $idle)"
 
     # Open our launcher page (same-origin fetch + postMessage into Perfetto),
     # not the ?url= deep link — the latter is mixed content (HTTPS UI fetching
@@ -363,10 +383,7 @@ httpd.serve_forever()
     # Title = the trace's basename, EXCEPT for generically-named traces
     # (chrometrace.json / sim_trace_final.json, gzipped or not) where the
     # filename carries no info and the PARENT DIRECTORY encodes what the trace
-    # is — use that instead so tabs are distinguishable. Derive the parent from
-    # the absolute path ($abs), not the root-relative $rel: they usually share a
-    # parent, but if root IS the parent (e.g. PTRACE_ROOT set to the run dir)
-    # $rel:h collapses to "." and the useful name is lost.
+    # is — use that instead so tabs are distinguishable.
     local title=${abs:t}
     case ${title%.gz} in
         chrometrace.json|sim_trace_final.json)
@@ -377,7 +394,7 @@ httpd.serve_forever()
     local title_enc
     title_enc=$(python3 -c 'import sys,urllib.parse; print(urllib.parse.quote(sys.argv[1]))' "$title")
     local url="http://$http_host:$port/__ptrace_open__?f=${enc}&title=${title_enc}"
-    print -P "  trace:       %B$rel%b"
+    print -P "  trace:       %B$abs%b"
     print -P "  then open:   %F{blue}$url%f"
     command -v browser-open >/dev/null 2>&1 && browser-open "$url" >/dev/null 2>&1 || true
 }
@@ -385,7 +402,7 @@ httpd.serve_forever()
 # Native (RPC accelerator) mode: trace_processor server preloaded with the trace.
 # One server = one trace = one port; re-running on a port swaps its trace.
 _ptrace_native() {
-    local file="$1" port="$2" idle="$3"
+    local file="$1" port="$2" idle="${3:-8h}"
 
     if ! command -v trace_processor >/dev/null 2>&1; then
         print -u2 "ptrace: trace_processor not found — run ./install.sh perfetto"
