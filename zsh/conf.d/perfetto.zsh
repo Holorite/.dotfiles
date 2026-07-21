@@ -14,22 +14,25 @@
 #
 #   ONE per-user server on a FIXED port serves MANY traces by token. Each
 #   invocation registers its trace in a local 0600 registry (token -> abspath)
-#   and ensures the server is up on a fixed port (base $PTRACE_HTTP_PORT 9201 +
-#   UID%50 — no probing, so opening two traces in quick succession CANNOT collide
-#   on a port: the second just adds another token/tab on the SAME port; the
-#   duplicate server it tries to launch exits on EADDRINUSE and the running one
-#   picks up the new token). The server serves ONLY registered tokens at
-#   /t/<token> (looked up by exact token, never by joining user input onto a dir,
-#   so traversal is structurally impossible) plus the launcher — every other path
-#   is 404, and only traces you explicitly `ptrace`'d are reachable. Each entry
-#   is dropped (404 thereafter) ~$PTRACE_HTTP_GRACE (default 30s) after ITS fetch
-#   delivers, so a file is on the wire only for its one click; the server itself
-#   reaps when the registry is empty and idle ($PTRACE_IDLE_TIMEOUT, default 15m
-#   for HTTP — much shorter than native's 8h). Reloading the *Perfetto* tab never
-#   re-hits our server (buffer cached in-tab post-handshake); only re-opening the
-#   launcher would, which the grace window covers. Users on a shared host land in
-#   different UID bands, and registration is a local file the server polls — a
-#   network party can fetch an allowlisted token but cannot add one.
+#   and ensures the (threaded) server is up on a fixed port (base
+#   $PTRACE_HTTP_PORT 9201 + UID%50 — no probing, so opening two traces in quick
+#   succession CANNOT collide on a port: the second just adds another token/tab
+#   on the SAME port; the duplicate server it tries to launch exits on
+#   EADDRINUSE and the running one picks up the new token). The server serves
+#   ONLY registered tokens at /t/<token> (looked up by exact token, never by
+#   joining user input onto a dir, so traversal is structurally impossible) plus
+#   the launcher — every other path is 404, and only traces you explicitly
+#   `ptrace`'d are reachable. Each token is reaped (404 thereafter) the INSTANT
+#   its transfer COMPLETES — the file crosses the wire exactly once, no timer
+#   (an interrupted transfer is NOT marked delivered, so its retry still works).
+#   $PTRACE_HTTP_GRACE>0 opts into keeping a delivered token fetchable that many
+#   extra seconds for a deliberate double-open. A never-fetched token (popup
+#   blocked / walked away) is reaped after $PTRACE_IDLE_TIMEOUT (default 15m for
+#   HTTP vs native's 8h), and the server itself reaps once the registry is empty
+#   and idle. Reloading the *Perfetto* tab never re-hits our server (buffer
+#   cached in-tab post-handshake). Users on a shared host land in different UID
+#   bands, and registration is a local file the server polls — a network party
+#   can fetch an allowlisted token but cannot add one.
 #   Cost: the file crosses the wire, and the browser's ~2 GB memory ceiling
 #   applies — hence the size cutoff to native mode. NOTE: window.open must ride
 #   a user gesture, so if the browser blocks the auto-popup the launcher page
@@ -69,9 +72,10 @@
 #   PTRACE_IDLE_TIMEOUT  inactivity before a server self-reaps. Default differs
 #                        by mode: 15m for HTTP (server reaps once its registry is
 #                        empty and idle), 8h for native. "never" disables.
-#   PTRACE_HTTP_GRACE    HTTP mode: seconds after a trace is delivered before its
-#                        registry entry is dropped (404 thereafter) — default 30;
-#                        "never"/0 disables per-entry reap, leaving only idle.
+#   PTRACE_HTTP_GRACE    HTTP mode: extra seconds to keep a token fetchable
+#                        AFTER its transfer completes (default 0 = reap the
+#                        instant the transfer finishes). Raise it only for a
+#                        deliberate double-open of the same trace.
 #   PTRACE_HTTP_MAX      auto-mode size cutoff in MB (default 1800).
 #   PTRACE_HTTP_PORT     base port for HTTP-mode servers (default 9201; the
 #                        actual per-user port is base + UID%50, fixed — one
@@ -225,7 +229,10 @@ _ptrace_http() {
 
     local idle_secs grace_secs
     idle_secs=$(_ptrace_secs "$idle")
-    grace_secs=$(_ptrace_secs "${PTRACE_HTTP_GRACE:-30}")
+    # Default 0: reap a token the instant its transfer completes (file on the
+    # wire exactly once). Set $PTRACE_HTTP_GRACE>0 to keep it fetchable that many
+    # extra seconds for a deliberate double-open.
+    grace_secs=$(_ptrace_secs "${PTRACE_HTTP_GRACE:-0}")
 
     # Fixed per-user port (base + UID%50): users on a shared host land in
     # different bands, and a single user's repeated opens all reuse the SAME
@@ -285,7 +292,7 @@ print(tok)
     # allowlist is empty and idle.
     local server_py='
 import sys, os, time, json, glob, shutil, threading
-from http.server import HTTPServer, SimpleHTTPRequestHandler
+from http.server import ThreadingHTTPServer, SimpleHTTPRequestHandler
 from urllib.parse import unquote, parse_qs, urlsplit
 reg, port, idle, grace = sys.argv[2], int(sys.argv[3]), int(sys.argv[4]), int(sys.argv[5])
 ed = os.path.join(reg, "entries")
@@ -381,7 +388,8 @@ class H(SimpleHTTPRequestHandler):
         if path == "/__ptrace_open__":
             self._send_html(LAUNCHER.encode("utf-8")); return
         if path.startswith("/t/"):
-            rec = allow.get(path[3:])
+            tok = path[3:]
+            rec = allow.get(tok)
             if not rec: self.send_error(404); return
             try:
                 f = open(rec["path"], "rb"); sz = os.fstat(f.fileno()).st_size
@@ -392,23 +400,45 @@ class H(SimpleHTTPRequestHandler):
             self.send_header("Content-Type", "application/octet-stream")
             self.send_header("Content-Length", str(sz))
             self.end_headers()
-            try: shutil.copyfileobj(f, self.wfile)
-            finally: f.close()
-            rec["delivered"] = time.time()   # full body written -> delivered
+            try:
+                shutil.copyfileobj(f, self.wfile)   # stream the whole body
+            except Exception:
+                return              # interrupted -> token stays alive for a retry
+            finally:
+                f.close()
+            # A COMPLETE transfer is the delivery signal: reap this token NOW so
+            # the file is on the wire exactly once (an interrupted transfer took
+            # the except-return above and is NOT marked delivered, so its retry
+            # still works). A >0 grace instead keeps it fetchable that many extra
+            # seconds (opt-in, for a deliberate double-open) — the reaper handles
+            # that case; here we handle the default immediate reap.
+            rec["delivered"] = time.time()
+            if grace <= 0:
+                allow.pop(tok, None)
+                try: os.remove(os.path.join(ed, tok + ".json"))
+                except OSError: pass
             return
         self.send_error(404)
     def log_message(self, *a): pass
 scan()
 try:
-    httpd = HTTPServer(("0.0.0.0", port), H)
+    # Threading: concurrent tabs fetching different traces must not serialize
+    # (a large download would otherwise block every other request), and a
+    # client that drops mid-transfer must not stall the next request.
+    httpd = ThreadingHTTPServer(("0.0.0.0", port), H)
 except OSError:
     os._exit(0)   # another of our servers already holds the port; it will serve us
 threading.Thread(target=maintain, daemon=True).start()
 httpd.serve_forever()
 '
+    # Message describing when this trace stops being served: on transfer
+    # complete (grace 0, the default) or after a grace window.
+    local reap_desc="on transfer"
+    (( grace_secs > 0 )) && reap_desc="~${grace_secs}s after transfer"
+
     # Is our server already up on this port? (matched by marker+reg in argv).
     if pgrep -f "PTRACE_HTTPD $reg $port" >/dev/null 2>&1; then
-        print -P "%F{green}ptrace:%f added to running server on $http_host:$port (reaps ~${grace_secs}s after open)"
+        print -P "%F{green}ptrace:%f added to running server on $http_host:$port (reaps $reap_desc)"
     else
         # Detach into its own session (setsid), stdio closed, so the server
         # outlives the shell/ssh session — closing the terminal won't SIGHUP it.
@@ -422,7 +452,7 @@ httpd.serve_forever()
                 </dev/null >/dev/null 2>&1 &
         fi
         disown 2>/dev/null
-        print -P "%F{green}ptrace:%f serving on $http_host:$port (per-user; reaps ~${grace_secs}s after open, idle $idle)"
+        print -P "%F{green}ptrace:%f serving on $http_host:$port (per-user; trace reaps $reap_desc, idle $idle)"
     fi
 
     # Open our launcher page (same-origin fetch + postMessage into Perfetto), not
